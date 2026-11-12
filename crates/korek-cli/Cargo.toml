@@ -57,7 +57,15 @@ miette = { workspace = true, features = ["fancy"] }
 serde_json.workspace = true
 
 [dev-dependencies]
+divan.workspace = true
 korek = { workspace = true }
+korek-core.workspace = true
+korek-ir.workspace = true
 korek-runtime.workspace = true
+korek-testkit.workspace = true
 serde.workspace = true
 tempfile.workspace = true
+
+[[bench]]
+name = "gen"
+harness = false

@@ -24,8 +24,10 @@ korek-gen-proto = { path = "crates/korek-gen-proto" }
 korek-gen-zod = { path = "crates/korek-gen-zod" }
 korek-gen-ts = { path = "crates/korek-gen-ts" }
 korek = { path = "crates/korek" }
+korek-testkit = { path = "crates/korek-testkit" }
 anyhow = "1"
 bpaf = { version = "0.9", features = ["derive"] }
+divan = "0.1"
 heck = "0.5"
 kdl = { version = "6", default-features = false, features = ["span"] }
 miette = "7"
