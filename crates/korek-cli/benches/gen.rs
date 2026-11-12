@@ -1,0 +1,111 @@
+//! Benchmarks on a large synthetic schema (`korek_testkit::synthetic`,
+//! about 2000 types and 500 keys): loading, the IR's JSON encoding, each
+//! generator, and whole `korek gen` runs with builtin and subprocess
+//! plugins. `cargo bench -p korek-cli`; numbers in BENCHMARKS.md.
+
+#![allow(clippy::unwrap_used)]
+
+use std::path::Path;
+use std::sync::LazyLock;
+
+use divan::Bencher;
+use korek::{Driver, Output};
+use korek_core::{Loader, SourceFile};
+use korek_ir::{GenerateRequest, Schema};
+use korek_testkit::synthetic::{Size, files, schema};
+
+fn main() {
+    divan::main();
+}
+
+static FILES: LazyLock<Vec<SourceFile>> = LazyLock::new(|| {
+    files(Size::LARGE)
+        .into_iter()
+        .map(|(path, contents)| SourceFile { path, contents })
+        .collect()
+});
+
+static SCHEMA: LazyLock<Schema> = LazyLock::new(|| load(FILES.clone()));
+
+fn load(files: Vec<SourceFile>) -> Schema {
+    Loader::new().load_sources(files, None).unwrap().schema
+}
+
+const GENERATORS: &[&str] = &["rust", "proto", "zod", "ts", "jsonschema"];
+
+type Plugin = fn(&GenerateRequest) -> Result<korek_ir::GenerateResponse, korek_ir::Diagnostic>;
+
+fn plugin(name: &str) -> Plugin {
+    match name {
+        "rust" => korek_gen_rust::plugin,
+        "proto" => korek_gen_proto::plugin,
+        "zod" => korek_gen_zod::plugin,
+        "ts" => korek_gen_ts::plugin,
+        _ => korek_gen_jsonschema::plugin,
+    }
+}
+
+/// Parse, lower, validate, check defaults and examples, number: the
+/// schema in 18 files, and in one.
+#[divan::bench(args = [false, true], sample_count = 30)]
+fn load_and_validate(b: Bencher, one_file: bool) {
+    let files = if one_file {
+        vec![SourceFile {
+            path: "bench.kdl".into(),
+            contents: schema(Size::LARGE),
+        }]
+    } else {
+        FILES.clone()
+    };
+    b.with_inputs(|| files.clone()).bench_values(load);
+}
+
+/// The `GenerateRequest` a subprocess plugin receives, as JSON.
+#[divan::bench]
+fn encode_request(b: Bencher) {
+    let req = GenerateRequest::new("x", SCHEMA.clone());
+    b.bench(|| serde_json::to_vec(&req).unwrap());
+}
+
+#[divan::bench(args = GENERATORS)]
+fn generator(b: Bencher, name: &str) {
+    let req = GenerateRequest::new(name, SCHEMA.clone());
+    let f = plugin(name);
+    b.bench(|| f(&req).unwrap());
+}
+
+fn driver(dir: &Path, subprocess: bool) -> Driver {
+    let mut d = Driver::new().with_builtins().no_path_lookup(true);
+    for name in GENERATORS {
+        if subprocess {
+            let exe = match *name {
+                "rust" => env!("CARGO_BIN_EXE_korek-gen-rust"),
+                "proto" => env!("CARGO_BIN_EXE_korek-gen-proto"),
+                "zod" => env!("CARGO_BIN_EXE_korek-gen-zod"),
+                "ts" => env!("CARGO_BIN_EXE_korek-gen-ts"),
+                _ => env!("CARGO_BIN_EXE_korek-gen-jsonschema"),
+            };
+            d = d.plugin(*name, exe);
+        }
+        d = d.output(Output::new(*name, dir.join("out").join(name)));
+    }
+    d
+}
+
+/// `korek gen` with all five generators, outputs already up to date:
+/// builtin plugins, subprocess plugins, and builtins with the input-hash
+/// cache warm.
+#[divan::bench(args = ["builtin", "subprocess", "cached"], sample_count = 20)]
+fn full_gen(b: Bencher, how: &str) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("schema")).unwrap();
+    for f in &*FILES {
+        std::fs::write(dir.path().join("schema").join(&f.path), &f.contents).unwrap();
+    }
+    let mut d = driver(dir.path(), how == "subprocess");
+    if how == "cached" {
+        d = d.cache(Some(dir.path().join("cache")));
+    }
+    d.run(&dir.path().join("schema")).unwrap();
+    b.bench(|| d.run(&dir.path().join("schema")).unwrap());
+}

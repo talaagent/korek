@@ -235,3 +235,49 @@ fn json_errors_without_a_location() {
     assert_eq!(d["file"], "types.kdl");
     assert_eq!((d["line"].as_u64(), d["col"].as_u64()), (Some(2), Some(11)));
 }
+
+/// The input-hash cache: a second identical run skips loading and every
+/// plugin; editing the schema, changing options or deleting an output
+/// regenerates.
+#[test]
+fn cache_skips_unchanged_runs() {
+    use korek::{Driver, Output, Via};
+    let tmp = tempfile::tempdir().unwrap();
+    let schema = tmp.path().join("schema");
+    copy_schema(&schema);
+    let cache = tmp.path().join("cache");
+    let driver = |opt: &str| {
+        Driver::new()
+            .with_builtins()
+            .no_path_lookup(true)
+            .cache(Some(cache.clone()))
+            .output(Output::new("rust", tmp.path().join("rust")))
+            .output(Output::new("ts", tmp.path().join("ts")).option("file", opt))
+    };
+    let vias = |r: &korek::Report| r.plugins.iter().map(|p| p.1).collect::<Vec<_>>();
+    let first = driver("a.ts").run(&schema).unwrap();
+    assert_eq!(vias(&first), [Via::Builtin, Via::Builtin]);
+    let second = driver("a.ts").run(&schema).unwrap();
+    assert_eq!(vias(&second), [Via::Cached, Via::Cached]);
+    assert_eq!(second.stale().count(), 0);
+    assert_eq!(second.files.len(), first.files.len());
+    // An option changes one output's key.
+    let r = driver("b.ts").run(&schema).unwrap();
+    assert_eq!(vias(&r), [Via::Cached, Via::Builtin]);
+    // A deleted output is regenerated.
+    std::fs::remove_file(tmp.path().join("rust/types.rs")).unwrap();
+    let r = driver("b.ts").run(&schema).unwrap();
+    assert_eq!(vias(&r), [Via::Builtin, Via::Cached]);
+    assert!(tmp.path().join("rust/types.rs").is_file());
+    // A schema edit misses everything.
+    let types = schema.join("types.kdl");
+    let text = std::fs::read_to_string(&types).unwrap();
+    std::fs::write(&types, text + "\nstruct Extra { field x \"string\" }\n").unwrap();
+    let r = driver("b.ts").run(&schema).unwrap();
+    assert_eq!(vias(&r), [Via::Builtin, Via::Builtin]);
+    assert!(r.stale().count() >= 2);
+    assert_eq!(
+        vias(&driver("b.ts").run(&schema).unwrap()),
+        [Via::Cached, Via::Cached]
+    );
+}

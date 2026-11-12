@@ -20,7 +20,7 @@ use korek_gen_common::{GENERATED, comment, doc_text};
 use korek_ir::naming::{self, shouty};
 use korek_ir::{
     Diagnostic, EnumDef, Idempotency, KeyGroup, Retired, RuleKind, Schema, Service, StructDef,
-    Type, TypeDef, TypeKind, UnionDef, Validate,
+    Type, TypeDef, TypeIndex, TypeKind, Types, UnionDef, Validate,
 };
 use korek_plugin::{File, GenerateRequest, GenerateResponse, Hook, Item};
 
@@ -80,6 +80,7 @@ breaking:
 
 struct Gen<'a> {
     schema: &'a Schema,
+    index: TypeIndex<'a>,
     opts: &'a Options,
     hooks: &'a [&'a dyn Hook],
     out: String,
@@ -100,9 +101,10 @@ pub fn generate(
 ) -> (Vec<File>, Vec<Diagnostic>) {
     let mut g = Gen {
         schema,
+        index: schema.index(),
         opts,
         hooks,
-        out: String::with_capacity(32 * 1024),
+        out: String::with_capacity(4096 + schema.types.len() * 1024),
         validates: false,
         timestamp: false,
         duration: false,
@@ -229,7 +231,7 @@ impl Gen<'_> {
 
     fn kind_of(&self, ty: &Type) -> Option<&TypeKind> {
         match ty {
-            Type::Named(n) => self.schema.get(n).map(|t: &TypeDef| &t.kind),
+            Type::Named(n) => self.index.get(n).map(|t: &TypeDef| &t.kind),
             _ => None,
         }
     }

@@ -14,10 +14,11 @@ You declare types (enums, structs, tagged and untagged unions), typed keys
 | `korek-gen-zod` | Zod v4 schemas, each `satisfies z.ZodType<T>` against the TS types (never `z.infer`), and a typed `keys` record |
 | `korek-gen-ts` | bare TypeScript types and a `Keys` interface; rules as JSDoc tags; no runtime dependency |
 | `korek-gen-jsonschema` | JSON Schema 2020-12 (one file, or one per type for MCP tool inputs) |
+| `korek-gen-docs` | markdown reference: types, keys tables, rules in words, units humanized; extra columns from extension metadata (`columns=Layers=ext:setting.props.layers`) |
 
 Generators are plugins, like protoc's `protoc-gen-*`: the `korek` driver
 loads and validates the schema, then sends each plugin the IR as a JSON
-`GenerateRequest`. The CLI links the five first-party generators in-process
+`GenerateRequest`. The CLI links the six first-party generators in-process
 (the default `builtin` feature); a `korek-gen-<name>` on `PATH` or
 `--plugin name=path` overrides them, and anything else runs as a subprocess.
 A third-party plugin is about 20 lines ([example](examples/plugin-example/src/main.rs)).
@@ -30,16 +31,21 @@ korek gen --rust src/gen --proto proto --zod web/gen/zod --ts web/gen/ts --jsons
 ```
 
 ```text
-korek gen [--rust DIR] [--proto DIR] [--zod DIR] [--ts DIR] [--jsonschema DIR] [--out NAME=DIR]...
+korek gen [--rust DIR] [--proto DIR] [--zod DIR] [--ts DIR] [--jsonschema DIR] [--docs DIR] [--out NAME=DIR]...
           [--<name>_opt k=v,..] [--opt NAME:k=v,..]... [--plugin NAME=PATH]... [--ext NAME]...
-          [--lock FILE] [--check] [--strict] [--no-builtin] [--message-format human|json] SCHEMA_DIR
+          [--lock FILE] [--check] [--strict] [--no-builtin] [--cache-dir DIR] [--no-cache]
+          [--message-format human|json] SCHEMA_DIR
 korek check SCHEMA_DIR   # validate only
 korek ir SCHEMA_DIR      # the IR plugins receive, as JSON
 ```
 
 Every `.kdl` file under `SCHEMA_DIR` is one schema. `--check` writes nothing
 and fails if any output or the lockfile is stale (run it in CI). Only files
-whose content changed are written, so mtimes are kept. `--strict` turns
+whose content changed are written, so mtimes are kept. Runs are cached
+under `--cache-dir` (default `target/korek-cache` when `./target` exists):
+a plugin whose inputs (schema files, lockfile, plugin binary, options,
+output directory) hash as before and whose outputs are unchanged on disk
+is skipped, and when every plugin is, the schema is not loaded at all. `--strict` turns
 `korek::rule_unsupported` warnings into errors. `--message-format json`
 prints diagnostics as JSON lines (code, severity, message, help, url,
 labels with file/line/col). Every code is documented in
@@ -296,8 +302,7 @@ output through `korek-testkit` to check it agrees with the shared vectors.
 Not in v1: `korek fmt`, a docs/markdown generator, schema imports across
 packages, breaking-change detection against a git ref, an LSP, Python and Go
 generators, recursive types, defining korek's own IR in a korek schema
-(self-hosting; [schema/korek](schema/korek) is the start), benchmarks and an
-input-hash cache.
+(self-hosting; [schema/korek](schema/korek) is the start).
 
 ## Development
 

@@ -1,6 +1,7 @@
 //! Typed values: JSON matched to a korek type.
 
-use crate::ir::{Field, Json, Schema, Type, TypeKind};
+use crate::Types;
+use crate::ir::{Field, Json, Type, TypeKind};
 
 /// A JSON value matched to its type, so generators can write literals
 /// (`Backend::Claude`, `McpStdio { .. }`) without re-deriving union
@@ -53,7 +54,7 @@ fn kind(j: &Json) -> &'static str {
 ///
 /// # Errors
 /// What does not match, with a path.
-pub fn resolve(schema: &Schema, ty: &Type, j: &Json) -> Result<Value, String> {
+pub fn resolve<S: Types + ?Sized>(schema: &S, ty: &Type, j: &Json) -> Result<Value, String> {
     let bad = || format!("expected {}, found {}", ty.display(), kind(j));
     let str_of = || j.as_str().map(str::to_owned).ok_or_else(bad);
     Ok(match ty {
@@ -98,7 +99,7 @@ pub fn resolve(schema: &Schema, ty: &Type, j: &Json) -> Result<Value, String> {
     })
 }
 
-fn named(schema: &Schema, name: &str, j: &Json) -> Result<Value, String> {
+fn named<S: Types + ?Sized>(schema: &S, name: &str, j: &Json) -> Result<Value, String> {
     let def = schema
         .get(name)
         .ok_or_else(|| format!("unknown type `{name}`"))?;
@@ -162,8 +163,8 @@ fn named(schema: &Schema, name: &str, j: &Json) -> Result<Value, String> {
     }
 }
 
-fn struct_value(
-    schema: &Schema,
+fn struct_value<S: Types + ?Sized>(
+    schema: &S,
     name: &str,
     fields: &[Field],
     o: &serde_json::Map<String, Json>,

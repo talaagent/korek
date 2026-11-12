@@ -13,7 +13,9 @@ use core::fmt::Write as _;
 use korek_gen_common::{GENERATED, comment, doc_text, rust_ident};
 use korek_ir::naming::{pascal, shouty};
 use korek_ir::value::{Value, resolve};
-use korek_ir::{Diagnostic, Field, Key, KeyGroup, Schema, Type, TypeDef, TypeKind};
+use korek_ir::{
+    Diagnostic, Field, Key, KeyGroup, Schema, Type, TypeDef, TypeIndex, TypeKind, Types,
+};
 use korek_plugin::{File, GenerateRequest, GenerateResponse, Hook, Item};
 
 /// Generator options.
@@ -187,6 +189,7 @@ fn rules_doc(v: &korek_ir::Validate) -> Vec<String> {
 struct Gen<'a> {
     schema: &'a Schema,
     opts: &'a Options,
+    index: TypeIndex<'a>,
     out: String,
     warnings: Vec<Diagnostic>,
 }
@@ -201,7 +204,8 @@ pub fn generate(
     let mut g = Gen {
         schema,
         opts,
-        out: String::with_capacity(32 * 1024),
+        index: schema.index(),
+        out: String::with_capacity(4096 + schema.types.len() * 2048),
         warnings: Vec::new(),
     };
     let _ = writeln!(g.out, "// {GENERATED}");
@@ -363,7 +367,7 @@ impl Gen<'_> {
     fn validate_impl(&mut self, t: &TypeDef) {
         let mut body = String::new();
         validate::type_body(
-            self.schema,
+            &self.index,
             t,
             self.opts.duration,
             &mut body,
@@ -382,11 +386,11 @@ impl Gen<'_> {
     }
 
     fn literal_json(&self, ty: &Type, unit: Option<&str>, j: &korek_ir::Json) -> String {
-        resolve(self.schema, ty, j).map_or_else(
+        resolve(&self.index, ty, j).map_or_else(
             |_| "unreachable!()".into(),
             |v| match unit {
                 Some(u) => duration_literal(u, &v),
-                None => literal_with(self.schema, &v, self.opts.duration),
+                None => literal_with(&self.index, &v, self.opts.duration),
             },
         )
     }
@@ -429,7 +433,7 @@ impl Gen<'_> {
         };
         let mut check = String::new();
         validate::value_checks(
-            self.schema,
+            &self.index,
             &k.ty,
             &k.validate,
             "v",
@@ -483,12 +487,12 @@ impl Gen<'_> {
 }
 
 /// A Rust expression building `v`.
-pub fn literal(schema: &Schema, v: &Value) -> String {
+pub fn literal<S: Types + ?Sized>(schema: &S, v: &Value) -> String {
     literal_with(schema, v, false)
 }
 
 /// [`literal`], with `duration` the `rust_duration` option.
-fn literal_with(schema: &Schema, v: &Value, duration: bool) -> String {
+fn literal_with<S: Types + ?Sized>(schema: &S, v: &Value, duration: bool) -> String {
     let lit = |v: &Value| literal_with(schema, v, duration);
     match v {
         Value::Bool(b) => b.to_string(),

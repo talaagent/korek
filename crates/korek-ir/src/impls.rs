@@ -3,10 +3,49 @@
 use crate::ir::{Ext, Format, Key, KeyGroup, RuleKind, Schema, Span, Type, TypeDef, Validate};
 use crate::protocol::{Diagnostic, File, GenerateRequest, GenerateResponse, Label, Severity};
 
+/// Looks up named types: [`Schema`] scans its list; [`TypeIndex`] hashes.
+pub trait Types {
+    /// The named type `name`, if declared.
+    fn get(&self, name: &str) -> Option<&TypeDef>;
+}
+
+impl Types for Schema {
+    fn get(&self, name: &str) -> Option<&TypeDef> {
+        self.types.iter().find(|t| t.name == name)
+    }
+}
+
+/// Constant-time type lookup by name. Build it once per pass over a large
+/// schema ([`Schema::index`]).
+#[derive(Debug, Clone)]
+pub struct TypeIndex<'a> {
+    by_name: std::collections::HashMap<&'a str, &'a TypeDef>,
+}
+
+impl<'a> TypeIndex<'a> {
+    /// [`Types::get`], borrowing from the schema rather than the index.
+    pub fn def(&self, name: &str) -> Option<&'a TypeDef> {
+        self.by_name.get(name).copied()
+    }
+}
+
+impl Types for TypeIndex<'_> {
+    fn get(&self, name: &str) -> Option<&TypeDef> {
+        self.by_name.get(name).copied()
+    }
+}
+
 impl Schema {
     /// The named type `name`, if declared.
     pub fn get(&self, name: &str) -> Option<&TypeDef> {
-        self.types.iter().find(|t| t.name == name)
+        Types::get(self, name)
+    }
+
+    /// A [`TypeIndex`] over this schema's types.
+    pub fn index(&self) -> TypeIndex<'_> {
+        TypeIndex {
+            by_name: self.types.iter().map(|t| (t.name.as_str(), t)).collect(),
+        }
     }
 
     /// Deserializes every value extension `name` attached at the top level.

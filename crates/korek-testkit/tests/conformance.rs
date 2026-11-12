@@ -85,3 +85,29 @@ fn the_vectors_schema_is_fresh() {
         "rerun with KOREK_BLESS=1"
     );
 }
+
+/// The benchmark schema loads cleanly.
+#[test]
+fn the_synthetic_schema_loads() {
+    let src = korek_testkit::synthetic::schema(korek_testkit::synthetic::Size::LARGE);
+    let loaded = korek_core::Loader::new()
+        .load_sources(
+            vec![korek_core::SourceFile {
+                path: "bench.kdl".into(),
+                contents: src,
+            }],
+            None,
+        )
+        .unwrap_or_else(|f| panic!("{f}"));
+    assert_eq!(loaded.schema.types.len(), 2000);
+    assert_eq!(
+        loaded
+            .schema
+            .keys
+            .iter()
+            .map(|g| g.keys.len())
+            .sum::<usize>(),
+        500
+    );
+    assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+}

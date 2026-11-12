@@ -1,7 +1,7 @@
 //! Evaluates `validate` rules on JSON values (defaults and examples) at
 //! load time, with the same format checks the generated Rust uses.
 
-use korek_ir::{Format, Json, RuleKind, Schema, Type, TypeKind, Validate};
+use korek_ir::{Format, Json, RuleKind, Type, TypeKind, Types, Validate};
 use korek_runtime::{base64, format, time};
 
 /// Checks `j` (already shape-checked against `ty`) against `v` and every
@@ -9,7 +9,12 @@ use korek_runtime::{base64, format, time};
 ///
 /// # Errors
 /// The first failure, with a path.
-pub fn check(schema: &Schema, ty: &Type, j: &Json, v: &Validate) -> Result<(), String> {
+pub fn check<S: Types + ?Sized>(
+    schema: &S,
+    ty: &Type,
+    j: &Json,
+    v: &Validate,
+) -> Result<(), String> {
     for r in &v.rules {
         rule(ty, j, &r.kind).map_err(|e| r.message.clone().unwrap_or(e))?;
     }
@@ -38,7 +43,24 @@ pub fn check(schema: &Schema, ty: &Type, j: &Json, v: &Validate) -> Result<(), S
     Ok(())
 }
 
-fn named(schema: &Schema, name: &str, j: &Json) -> Result<(), String> {
+/// Compiles `pattern` once per thread: a schema repeats the same patterns
+/// across many fields, defaults and examples.
+pub(crate) fn compile(pattern: &str) -> Result<regex::Regex, String> {
+    thread_local! {
+        static CACHE: core::cell::RefCell<std::collections::HashMap<String, regex::Regex>> =
+            core::cell::RefCell::default();
+    }
+    CACHE.with(|c| {
+        if let Some(re) = c.borrow().get(pattern) {
+            return Ok(re.clone());
+        }
+        let re = regex::Regex::new(pattern).map_err(|e| e.to_string())?;
+        c.borrow_mut().insert(pattern.to_owned(), re.clone());
+        Ok(re)
+    })
+}
+
+fn named<S: Types + ?Sized>(schema: &S, name: &str, j: &Json) -> Result<(), String> {
     let Some(def) = schema.get(name) else {
         return Ok(());
     };
@@ -137,7 +159,7 @@ fn rule(ty: &Type, j: &Json, kind: &RuleKind) -> Result<(), String> {
             fail(format!("must be at most {n} bytes"))
         }
         RuleKind::Pattern { regex } => {
-            let re = regex::Regex::new(regex).map_err(|e| e.to_string())?;
+            let re = compile(regex)?;
             if text().is_some_and(|t| !re.is_match(&t)) {
                 return fail(format!("must match {regex:?}"));
             }

@@ -108,12 +108,11 @@ fn hex(s: &str) -> bool {
 }
 
 pub fn uuid(s: &str) -> bool {
-    let p: Vec<&str> = s.split('-').collect();
-    p.len() == 5
-        && [8, 4, 4, 4, 12]
-            .iter()
-            .zip(&p)
-            .all(|(n, x)| x.len() == *n && hex(x))
+    let mut parts = s.split('-');
+    [8, 4, 4, 4, 12]
+        .iter()
+        .all(|n| parts.next().is_some_and(|x| x.len() == *n && hex(x)))
+        && parts.next().is_none()
 }
 
 /// A UUID without dashes.
@@ -182,22 +181,22 @@ pub fn time(s: &str) -> bool {
 
 fn units(s: &str, order: &str, frac: bool) -> bool {
     let mut pos = 0;
-    let mut num = String::new();
-    for c in s.chars() {
+    let mut start = 0;
+    for (at, c) in s.char_indices() {
         if c.is_ascii_digit() || (frac && c == '.') {
-            num.push(c);
-        } else {
-            let Some(i) = order[pos..].find(c) else {
-                return false;
-            };
-            if num.is_empty() || num.parse::<f64>().is_err() {
-                return false;
-            }
-            pos += i + 1;
-            num.clear();
+            continue;
         }
+        let Some(i) = order[pos..].find(c) else {
+            return false;
+        };
+        let num = &s[start..at];
+        if num.is_empty() || num.parse::<f64>().is_err() {
+            return false;
+        }
+        pos += i + 1;
+        start = at + c.len_utf8();
     }
-    num.is_empty()
+    start == s.len()
 }
 
 /// ISO 8601 duration (`P1Y2M3DT4H5M6.5S`, `P2W`).
@@ -237,11 +236,16 @@ pub fn base64url(s: &str) -> bool {
 
 /// Three base64url segments whose header decodes to a JSON object.
 pub fn jwt(s: &str) -> bool {
-    let p: Vec<&str> = s.split('.').collect();
-    p.len() == 3
-        && p[..2].iter().all(|x| !x.is_empty() && base64url(x))
-        && (p[2].is_empty() || base64url(p[2]))
-        && crate::base64::decode_with(p[0], true)
+    let mut p = s.split('.');
+    let (Some(header), Some(payload), Some(sig), None) = (p.next(), p.next(), p.next(), p.next())
+    else {
+        return false;
+    };
+    [header, payload]
+        .iter()
+        .all(|x| !x.is_empty() && base64url(x))
+        && (sig.is_empty() || base64url(sig))
+        && crate::base64::decode_with(header, true)
             .is_some_and(|h| h.trim_ascii_start().starts_with(b"{"))
 }
 

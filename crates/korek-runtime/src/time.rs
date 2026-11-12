@@ -80,7 +80,7 @@ fn parse_clock(s: &str) -> Option<(f64, &str)> {
         if end == 9 {
             return None;
         }
-        frac = format!("0{}", &s[8..end]).parse().ok()?;
+        frac = s[8..end].parse().ok()?;
     }
     Some((f64::from(h * 3600 + m * 60 + sec) + frac, &s[end..]))
 }

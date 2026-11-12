@@ -99,11 +99,40 @@ impl<'e> Parser<'e> {
         }
     }
 
-    pub fn file(&mut self, file: &SourceFile) {
+    /// Parses and lowers every file. KDL parsing, most of the work, runs
+    /// on one thread per file; lowering is in file order.
+    pub fn files(&mut self, files: &[SourceFile]) {
+        let docs: Vec<Result<KdlDocument, kdl::KdlError>> = if files.len() > 1 {
+            std::thread::scope(|s| {
+                let handles: Vec<_> = files
+                    .iter()
+                    .map(|f| s.spawn(|| KdlDocument::parse_v2(&f.contents)))
+                    .collect();
+                handles
+                    .into_iter()
+                    .zip(files)
+                    .map(|(h, f)| {
+                        h.join()
+                            .unwrap_or_else(|_| KdlDocument::parse_v2(&f.contents))
+                    })
+                    .collect()
+            })
+        } else {
+            files
+                .iter()
+                .map(|f| KdlDocument::parse_v2(&f.contents))
+                .collect()
+        };
+        for (file, doc) in files.iter().zip(docs) {
+            self.file(file, doc);
+        }
+    }
+
+    fn file(&mut self, file: &SourceFile, doc: Result<KdlDocument, kdl::KdlError>) {
         #[allow(clippy::cast_possible_truncation)]
         let id = self.schema.files.len() as u32;
         self.schema.files.push(file.path.clone());
-        let doc = match KdlDocument::parse_v2(&file.contents) {
+        let doc = match doc {
             Ok(d) => d,
             Err(e) => {
                 for d in e.diagnostics {

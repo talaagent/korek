@@ -10,7 +10,7 @@ Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zo
   examples (`check.rs`), lockfile numbering (`lock.rs`), extensions (`ext.rs`), sources (`source.rs`, a shim
   until talaagent/kdl-serde's `kdl-load` lands), diagnostics (`diag.rs`; miette only behind `miette`).
 - `crates/korek-plugin`: `run`, `Encoding`, `Hook`; depends on korek-ir only.
-- `crates/korek-gen-common`: shared generator helpers. `crates/korek-gen-{rust,proto,zod,ts,jsonschema}`:
+- `crates/korek-gen-common`: shared generator helpers. `crates/korek-gen-{rust,proto,zod,ts,jsonschema,docs}`:
   `generate(&schema, &opts, hooks)` and `plugin(&req)`. Zod builds on the TS crate.
 - `crates/korek-runtime`: what generated Rust uses (`Validate`, `Key<T>`, formats, base64, time).
 - `crates/korek`: the facade and `Driver`. `crates/korek-cli`: the `korek` binary (`builtin` feature links

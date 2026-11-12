@@ -6,6 +6,8 @@
 
 use core::fmt::Write as _;
 
+pub mod synthetic;
+
 use serde::Deserialize;
 
 /// One vector.

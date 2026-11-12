@@ -43,10 +43,15 @@ path = "src/bin/korek-gen-ts.rs"
 name = "korek-gen-jsonschema"
 path = "src/bin/korek-gen-jsonschema.rs"
 
+[[bin]]
+name = "korek-gen-docs"
+path = "src/bin/korek-gen-docs.rs"
+
 [dependencies]
 anyhow.workspace = true
 bpaf.workspace = true
 korek = { workspace = true, default-features = false, features = ["miette"] }
+korek-gen-docs.workspace = true
 korek-gen-jsonschema.workspace = true
 korek-gen-proto.workspace = true
 korek-gen-rust.workspace = true
@@ -57,8 +62,16 @@ miette = { workspace = true, features = ["fancy"] }
 serde_json.workspace = true
 
 [dev-dependencies]
+divan.workspace = true
 insta.workspace = true
 korek = { workspace = true }
+korek-core.workspace = true
+korek-ir.workspace = true
 korek-runtime.workspace = true
+korek-testkit.workspace = true
 serde.workspace = true
 tempfile.workspace = true
+
+[[bench]]
+name = "gen"
+harness = false
