@@ -170,6 +170,13 @@ fn print_failure(f: &Failure, json: bool) {
     print_diagnostics(&f.diagnostics, &f.sources, json);
 }
 
+/// Prints an error with no source location (as a JSON line with a `null`
+/// location under `--message-format json`).
+fn print_error(code: &str, message: String, json: bool) {
+    let d = korek::ir::Diagnostic::error(code, message);
+    print_diagnostics(&[d], &Sources::default(), json);
+}
+
 fn gen_driver(a: &GenArgs) -> Result<Driver, String> {
     let mut d = Driver::new().check(a.check).strict(a.strict);
     if !a.no_builtin {
@@ -237,7 +244,7 @@ fn run_gen(a: &GenArgs) -> ExitCode {
     let d = match gen_driver(a) {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("error: {e}");
+            print_error(korek::korek_core::codes::INVALID_OPTION, e, a.common.json);
             return ExitCode::from(2);
         }
     };
@@ -285,7 +292,7 @@ fn run_load(c: &Common, ir: bool) -> ExitCode {
         match serde_json::to_string_pretty(&l.schema) {
             Ok(s) => println!("{s}"),
             Err(e) => {
-                eprintln!("error: {e}");
+                print_error(korek::korek_core::codes::IO, e.to_string(), c.json);
                 return ExitCode::FAILURE;
             }
         }

@@ -48,31 +48,46 @@ pub fn sort(d: &mut [Diagnostic]) {
     });
 }
 
-/// One diagnostic as JSON: code, severity, message, help, url and labels
-/// with file, line and column.
+/// One diagnostic as JSON: code, severity, message, help, url, the primary
+/// location (`file`, `line`, `col`; all `null` when the diagnostic has no
+/// source location, like an I/O or plugin error) and labels with file, line
+/// and column.
 pub fn diagnostic_json(d: &Diagnostic, sources: &Sources) -> serde_json::Value {
     let labels: Vec<serde_json::Value> = d
         .labels
         .iter()
         .map(|l| {
-            let (line, col) = sources.line_col(l.span).unwrap_or((0, 0));
-            serde_json::json!({
-                "file": sources.file(l.span).map(|f| f.path.as_str()),
-                "line": line,
-                "col": col,
-                "offset": l.span.offset,
-                "len": l.span.len,
-                "text": l.text,
-            })
+            let mut v = location_json(Some(l.span), sources);
+            v["offset"] = l.span.offset.into();
+            v["len"] = l.span.len.into();
+            v["text"] = l.text.clone().into();
+            v
         })
         .collect();
-    serde_json::json!({
+    let mut v = serde_json::json!({
         "code": d.code,
         "severity": match d.severity { Severity::Error => "error", Severity::Warning => "warning" },
         "message": d.message,
         "help": d.help,
         "url": d.code.starts_with("korek::").then(|| korek_ir::codes::url(&d.code)),
-        "labels": labels,
+    });
+    if let (Some(o), serde_json::Value::Object(loc)) =
+        (v.as_object_mut(), location_json(d.span(), sources))
+    {
+        o.extend(loc);
+    }
+    v["labels"] = labels.into();
+    v
+}
+
+/// `{file, line, col}` for a span, each `null` when unknown.
+fn location_json(span: Option<korek_ir::Span>, sources: &Sources) -> serde_json::Value {
+    let file = span.and_then(|s| sources.file(s)).map(|f| f.path.as_str());
+    let lc = span.and_then(|s| sources.line_col(s));
+    serde_json::json!({
+        "file": file,
+        "line": lc.map(|(l, _)| l),
+        "col": lc.map(|(_, c)| c),
     })
 }
 
