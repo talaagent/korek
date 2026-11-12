@@ -1,0 +1,46 @@
+// The plugin protocol, in korek's own language: the start of self-hosting.
+// Mirrors korek_ir::protocol; the IR (korek_ir::ir) follows once korek has a
+// `json` primitive for defaults, examples and metadata.
+package "korek.protocol.v1"
+
+struct Span {
+  doc "A location in one of the schema's source files."
+  field file "u32" { doc "Index into the schema's files." }
+  field offset "u32" { doc "Byte offset of the start." }
+  field len "u32" { doc "Length in bytes." }
+}
+
+enum Severity {
+  variant error
+  variant warning
+}
+
+struct Label {
+  doc "A labeled source location."
+  field span "Span"
+  field text "string" optional=#true
+}
+
+struct Diagnostic {
+  doc "A problem, from the loader or a plugin."
+  field code "string" {
+    doc "Stable and namespaced: korek::unknown_type, korek_gen_proto::…"
+    validate { pattern "^[a-z_][a-z0-9_]*::[a-z_][a-z0-9_]*$" }
+  }
+  field severity "Severity" default="error"
+  field message "string"
+  field help "string" optional=#true
+  field labels "list<Label>" optional=#true { doc "The first label is the primary location." }
+}
+
+struct File {
+  doc "A generated file, relative to the plugin's output directory."
+  field path "string" { validate { min_len 1; not_contains ".." } }
+  field content "string"
+}
+
+struct GenerateResponse {
+  doc "What a plugin answers."
+  field files "list<File>"
+  field diagnostics "list<Diagnostic>" optional=#true { doc "Errors fail the run; warnings are reported." }
+}

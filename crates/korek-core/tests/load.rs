@@ -311,3 +311,27 @@ fn diagnostics_have_json_form() {
     assert_eq!(j[0]["labels"][0]["col"], 11);
     assert_eq!(j[0]["labels"][0]["file"], "test.kdl");
 }
+
+/// `schema/korek` (korek's own types in korek) loads and matches the
+/// hand-written protocol types' JSON field names.
+#[test]
+fn self_hosting_schema_loads() {
+    let dir = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../schema/korek"));
+    let loaded = Loader::new()
+        .lock_path(std::env::temp_dir().join("korek-selfhost.lock"))
+        .load(dir)
+        .unwrap();
+    let resp = korek_core::ir::GenerateResponse::new(vec![korek_core::ir::File::new("a", "b")]);
+    let json = serde_json::to_value(&resp).unwrap();
+    let TypeKind::Struct(s) = &loaded.schema.get("GenerateResponse").unwrap().kind else {
+        panic!()
+    };
+    let names: Vec<&str> = s.fields.iter().map(|f| f.name.as_str()).collect();
+    let keys: Vec<&str> = json
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(names, keys);
+}

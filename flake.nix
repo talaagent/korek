@@ -50,7 +50,7 @@
           cargoLock.lockFile = ./Cargo.lock;
           cargoBuildFlags = [
             "-p"
-            "korek"
+            "korek-cli"
           ];
           # The suite shells out to buf/protoc and bun; run it in the dev shell.
           doCheck = false;
