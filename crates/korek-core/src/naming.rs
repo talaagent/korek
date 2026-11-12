@@ -41,9 +41,10 @@ pub fn proto_wrappers<'a>(
 ) -> Vec<Type> {
     let mut out: Vec<Type> = Vec::new();
     fn need(t: &Type, out: &mut Vec<Type>) {
-        if let Type::List(inner) | Type::Map(inner) = t {
-            need(inner, out);
-        }
+        let (Type::List(inner) | Type::Map(inner)) = t else {
+            return;
+        };
+        need(inner, out);
         if !out.contains(t) {
             out.push(t.clone());
         }

@@ -1,0 +1,18 @@
+[package]
+name = "korek-gen-rust"
+description = "korek's Rust generator: serde types and typed key consts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+heck.workspace = true
+korek-core.workspace = true
+korek-plugin.workspace = true

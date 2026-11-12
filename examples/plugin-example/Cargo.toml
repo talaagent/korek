@@ -1,0 +1,13 @@
+[package]
+name = "korek-gen-example"
+description = "An example third-party korek plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+korek-plugin.workspace = true

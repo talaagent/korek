@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = ["crates/*", "examples/plugin-example"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,6 +13,11 @@ publish = false
 
 [workspace.dependencies]
 korek-core = { path = "crates/korek-core" }
+korek-plugin = { path = "crates/korek-plugin" }
+korek-gen-rust = { path = "crates/korek-gen-rust" }
+korek-gen-proto = { path = "crates/korek-gen-proto" }
+korek-gen-zod = { path = "crates/korek-gen-zod" }
+korek-gen-ts = { path = "crates/korek-gen-ts" }
 korek = { path = "crates/korek" }
 bpaf = { version = "0.9", features = ["derive"] }
 heck = "0.5"

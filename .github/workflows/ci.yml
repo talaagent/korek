@@ -26,7 +26,6 @@ jobs:
       - name: test
         run: nix develop -c cargo test --workspace
       - name: generated files are fresh
-        run: nix develop -c cargo run -q -p korek -- gen --check --rust examples/basic/gen/rust --proto examples/basic/gen/proto --zod examples/basic/gen/zod --ts examples/basic/gen/ts examples/basic/schema
+        run: nix develop -c cargo build -q -p korek && PATH=$PWD/target/debug:$PATH korek gen --check --rust examples/basic/gen/rust --proto examples/basic/gen/proto --zod examples/basic/gen/zod --ts examples/basic/gen/ts examples/basic/schema
       - name: bun test
-        working-directory: ts
         run: nix develop -c sh -c 'bun install --frozen-lockfile && bun test && bun run typecheck'
