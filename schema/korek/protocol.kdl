@@ -1,7 +1,15 @@
-// The plugin protocol, in korek's own language: the start of self-hosting.
-// Mirrors korek_ir::protocol; the IR (korek_ir::ir) follows once korek has a
-// `json` primitive for defaults, examples and metadata.
-package "korek.protocol.v1"
+// The plugin protocol, in korek's own language: mirrors korek_ir::protocol
+// (the IR is in ir.kdl). See "Self-hosting" in CLAUDE.md.
+package "korek.v1"
+
+struct GenerateRequest {
+  doc "What the driver sends a plugin."
+  field protocol_version "u32" { doc "korek_ir::PROTOCOL_VERSION of the driver." }
+  field korek_version "string"
+  field plugin "string" { doc "The plugin's name (rust for korek-gen-rust)." }
+  field options "map<string,string>" default="{}"
+  field schema "Schema" { doc "The validated schema, extension metadata included." }
+}
 
 struct Span {
   doc "A location in one of the schema's source files."

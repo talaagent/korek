@@ -1,0 +1,333 @@
+// The IR, in korek's own language: mirrors korek_ir::ir field for field.
+// The JSON form is the same as korek-ir's serde form (checked by
+// crates/korek-fixture/tests/selfhost.rs); the Rust types differ where korek
+// cannot say what korek-ir says (see "Self-hosting" in CLAUDE.md):
+// - `#[serde(default, skip_serializing_if = …)]` fields are optional here
+//   (`Option<Vec<T>>` rather than `Vec<T>`, `Option<bool>` rather than `bool`);
+// - externally tagged enums (`Type`, `TypeKind`) are untagged unions of
+//   one-field structs (`{"list": …}`) and an enum for the unit variants;
+// - recursion (`Type` in `list<T>`, nested `Validate` blocks) is `json`,
+//   as korek has no recursive types yet;
+// - unit rule variants (`finite`, `unique`, …) carry an empty struct.
+
+struct Schema {
+  doc "A whole schema: every .kdl file of a directory, lowered and validated."
+  field package "string" { doc "The Protobuf-style package, korek.v1 when the schema has none." }
+  field files "list<string>" { doc "Source files, relative to the schema directory, in load order." }
+  field types "list<TypeDef>"
+  field keys "list<KeyGroup>"
+  field services "list<Service>"
+  field ext "map<string,list<json>>" optional=#true { doc "Top-level extension nodes." }
+}
+
+struct Attrs {
+  doc "Documentation and metadata every item can carry."
+  field doc "string" optional=#true { doc "One line." }
+  field description "string" optional=#true { doc "Long markdown." }
+  field examples "list<json>" optional=#true { doc "Example values, checked against the type and its rules." }
+  field unit "string" optional=#true
+  field deprecated "string" optional=#true
+  field aliases "list<string>" optional=#true { doc "Former or alternative names." }
+  field since "string" optional=#true
+  field secret "bool" optional=#true { doc "Never printed or rendered with its value; absent when false." }
+  field ui "Ui" optional=#true { doc "UI hints." }
+  field meta "list<Meta>" optional=#true { doc "Namespaced metadata passed through untouched." }
+  field ext "map<string,list<json>>" optional=#true { doc "Extension metadata." }
+}
+
+struct Ui {
+  doc "UI hints for forms and docs."
+  field label "string" optional=#true
+  field section "string" optional=#true
+  field level "Level" optional=#true
+  field widget "string" optional=#true { doc "e.g. textarea, select, toggle, duration." }
+}
+
+enum Level {
+  variant basic
+  variant advanced
+}
+
+struct Meta {
+  doc "meta \"<namespace>\" key=value …"
+  field namespace "string"
+  field props "map<string,json>" optional=#true
+}
+
+struct TypeDef {
+  doc "A named type."
+  field name "string"
+  field kind "TypeKind"
+  field attrs "Attrs" default="{}"
+  field validate "Validate" optional=#true { doc "Message-level rules (required on unions, cel on structs)." }
+  field span "Span"
+}
+
+// Externally tagged in korek-ir: {"enum": …} | {"struct": …} | {"union": …}.
+union TypeKind {
+  variant enum "EnumKind"
+  variant struct "StructKind"
+  variant union "UnionKind"
+}
+
+struct EnumKind {
+  field enum "EnumDef"
+}
+
+struct StructKind {
+  field struct "StructDef"
+}
+
+struct UnionKind {
+  field union "UnionDef"
+}
+
+struct EnumDef {
+  doc "A closed set of names, serialized as the names."
+  field variants "list<EnumVariant>"
+  field retired "list<Retired>" optional=#true { doc "Numbers of removed variants, never reused." }
+}
+
+struct EnumVariant {
+  field name "string" { doc "lower_snake_case, also the serialized form." }
+  field number "u32" { doc "Protobuf value number (>= 1; 0 is UNSPECIFIED)." }
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+struct StructDef {
+  field fields "list<Field>"
+  field retired "list<Retired>" optional=#true
+}
+
+struct Field {
+  field name "string" { doc "lower_snake_case, also the serialized name." }
+  field ty "Type"
+  field optional "bool"
+  field default "json" optional=#true { doc "The default in canonical JSON, checked against type and rules." }
+  field validate "Validate" optional=#true
+  field number "u32" { doc "Protobuf field number." }
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+struct UnionDef {
+  doc "One of several types: tagged (variants are structs) or untagged (the first variant that matches)."
+  field tag "string" optional=#true
+  field variants "list<UnionVariant>"
+  field retired "list<Retired>" optional=#true
+}
+
+struct UnionVariant {
+  field name "string"
+  field ty "Type"
+  field number "u32" { doc "Protobuf field number in the oneof." }
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+struct Retired {
+  doc "A removed item whose number stays reserved."
+  field name "string"
+  field number "u32"
+}
+
+struct KeyGroup {
+  doc "A keys block: named, typed keys with defaults."
+  field name "string" { doc "Dotted lower_snake_case (session, ui.theme)." }
+  field keys "list<Key>"
+  field retired "list<Retired>" optional=#true
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+struct Key {
+  field name "string" { doc "Dotted lower_snake_case within the block (steer.enabled)." }
+  field ty "Type"
+  field default "json" optional=#true
+  field validate "Validate" optional=#true
+  field number "u32" { doc "Protobuf field number in the block's <Block>Keys message." }
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+struct Service {
+  doc "An RPC service."
+  field name "string"
+  field rpcs "list<Rpc>"
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+struct Rpc {
+  field name "string"
+  field input "string" { doc "A struct or union type name." }
+  field output "string"
+  field idempotency "Idempotency" optional=#true
+  field attrs "Attrs" default="{}"
+  field span "Span"
+}
+
+enum Idempotency {
+  variant no_side_effects
+  variant idempotent
+}
+
+// Externally tagged in korek-ir: "bool" | {"list": T} | {"map": T} | {"named": "X"}.
+union Type {
+  doc "A type."
+  variant primitive "Primitive"
+  variant list "ListType"
+  variant map "MapType"
+  variant named "NamedType"
+}
+
+enum Primitive {
+  variant bool
+  variant string
+  variant bytes
+  variant i32
+  variant i64
+  variant u32
+  variant u64
+  variant f32
+  variant f64
+  variant timestamp
+  variant duration
+  variant json
+}
+
+struct ListType {
+  field list "json" { doc "The item Type (recursive, so json for now)." }
+}
+
+struct MapType {
+  field map "json" { doc "The value Type of a map<string,T> (recursive, so json for now)." }
+}
+
+struct NamedType {
+  field named "string" { doc "A reference to a TypeDef." }
+}
+
+struct Validate {
+  doc "The validate block of a field, key, type or element."
+  field rules "list<Rule>" optional=#true
+  field items "json" optional=#true { doc "Rules for each list item (a Validate; recursive, so json for now)." }
+  field keys "json" optional=#true { doc "Rules for each map key (a Validate)." }
+  field values "json" optional=#true { doc "Rules for each map value (a Validate)." }
+}
+
+struct Rule {
+  field kind "RuleKind"
+  field message "string" optional=#true { doc "A custom error message." }
+  field span "Span"
+}
+
+union RuleKind tag="rule" {
+  doc "One validation rule. See VALIDATION.md for what each target supports."
+  variant const "JsonOperand"
+  variant in "JsonOperands"
+  variant not_in "JsonOperands"
+  variant len "CountOperand"
+  variant min_len "CountOperand"
+  variant max_len "CountOperand"
+  variant len_bytes "CountOperand"
+  variant min_bytes "CountOperand"
+  variant max_bytes "CountOperand"
+  variant pattern "PatternOperand"
+  variant prefix "TextOperand"
+  variant suffix "TextOperand"
+  variant contains "TextOperand"
+  variant not_contains "TextOperand"
+  variant format "FormatOperand"
+  variant gt "JsonOperand"
+  variant gte "JsonOperand"
+  variant lt "JsonOperand"
+  variant lte "JsonOperand"
+  variant finite "NoOperand"
+  variant multiple_of "JsonOperand"
+  variant min_items "CountOperand"
+  variant max_items "CountOperand"
+  variant unique "NoOperand"
+  variant min_pairs "CountOperand"
+  variant max_pairs "CountOperand"
+  variant required "NoOperand"
+  variant defined_only "NoOperand"
+  variant gt_now "NoOperand"
+  variant lt_now "NoOperand"
+  variant within "WithinOperand"
+  variant cel "CelOperand"
+}
+
+struct NoOperand {
+  doc "A rule without operands."
+}
+
+struct JsonOperand {
+  field value "json"
+}
+
+struct JsonOperands {
+  field values "list<json>"
+}
+
+struct CountOperand {
+  field n "u64"
+}
+
+struct PatternOperand {
+  field regex "string" { doc "A regular expression (RE2 syntax) that must match somewhere." }
+}
+
+struct TextOperand {
+  field value "string"
+}
+
+struct FormatOperand {
+  field format "Format"
+}
+
+struct WithinOperand {
+  field duration "string" { doc "Within a duration of now (\"3600s\")." }
+}
+
+struct CelOperand {
+  doc "A protovalidate CEL expression, with optional equivalents for other targets."
+  field id "string"
+  field expression "string"
+  field ts "string" optional=#true { doc "A TypeScript predicate (v) => boolean." }
+  field rust "string" optional=#true { doc "A Rust expression over v that is true when valid." }
+}
+
+enum Format {
+  doc "Well-known string formats."
+  variant email
+  variant hostname
+  variant ip
+  variant ipv4
+  variant ipv6
+  variant ip_with_prefixlen
+  variant cidr
+  variant uri
+  variant uri_ref
+  variant url
+  variant uuid
+  variant tuuid
+  variant ulid
+  variant host_and_port
+  variant address
+  variant cuid
+  variant cuid2
+  variant nanoid
+  variant datetime
+  variant date
+  variant time
+  variant duration
+  variant base64
+  variant base64url
+  variant jwt
+  variant e164
+  variant emoji
+  variant lowercase
+  variant uppercase
+}
