@@ -74,3 +74,24 @@ spans unchanged). The one-file slowdown, ~35% fastest-to-fastest, comes
 from the `kdl` 6.5 → 6.7 parser and also hits kdl-serde; the 18-file load
 is within the noise. `full_gen` and the generators were not touched; their
 runs here differed by up to 2× between identical builds.
+
+## After kdl-tree (kdl-serde 922c43d)
+
+Parsing moved from the `kdl` crate to kdl-serde's own `kdl-tree` parser
+(kdl-load's `into_tree()`, `kdl-compat` off, so `kdl` is no longer built).
+Before (437e9ae) and after were run twice, interleaved, on a busy host
+(load average 40–60); fastest / median of 30 samples (20 for `full_gen`):
+
+| Benchmark | Before (kdl 6.7.1) | After (kdl-tree) |
+|---|---:|---:|
+| `load_and_validate`, 18 files | 62.6–85.3 / 66.1–150.6 ms | 20.6 / 22.7–22.8 ms |
+| `load_and_validate`, one file | 287.6–289.5 / 294.1–326.6 ms | 38.7–38.9 / 43.9–44.5 ms |
+| `full_gen` builtin | 170.4 / 177.9 ms | 55.2 / 62.3 ms |
+| `full_gen` subprocess | 200.2 / 206.1 ms | 88.1 / 98.3 ms |
+| `full_gen` cached | 2.75 / 2.86 ms | 2.75 / 2.89 ms |
+
+Loading is ~3× faster on 18 files and ~7× on one file: KDL parsing no longer
+dominates, so the one-file load (one thread) is now mostly lowering and
+validation. Diagnostics keep their codes and spans, except that a node's
+span no longer takes the whitespace before a closing `}`, and syntax errors
+carry kdl-tree's messages.
