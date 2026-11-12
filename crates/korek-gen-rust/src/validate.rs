@@ -5,7 +5,7 @@ use core::fmt::Write as _;
 use korek_gen_common::{rust_ident, unsupported};
 use korek_ir::naming::pascal;
 use korek_ir::{
-    Diagnostic, Format, Json, Rule, RuleKind, Schema, Type, TypeDef, TypeKind, Validate,
+    Diagnostic, Format, Json, Rule, RuleKind, Type, TypeDef, TypeIndex, TypeKind, Types, Validate,
 };
 
 use crate::RT;
@@ -57,7 +57,7 @@ fn contains_named(ty: &Type) -> bool {
 
 /// The body of `validate_at` for a type.
 pub(crate) fn type_body(
-    schema: &Schema,
+    schema: &TypeIndex<'_>,
     t: &TypeDef,
     out: &mut String,
     warnings: &mut Vec<Diagnostic>,
@@ -190,7 +190,7 @@ fn num_lit(ty: &Type, j: &Json) -> String {
 /// in scope.
 #[allow(clippy::cognitive_complexity)]
 pub(crate) fn value_checks(
-    schema: &Schema,
+    schema: &TypeIndex<'_>,
     ty: &Type,
     v: &Validate,
     var: &str,

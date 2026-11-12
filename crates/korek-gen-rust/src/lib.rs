@@ -13,7 +13,9 @@ use core::fmt::Write as _;
 use korek_gen_common::{GENERATED, comment, doc_text, rust_ident};
 use korek_ir::naming::{pascal, shouty};
 use korek_ir::value::{Value, resolve};
-use korek_ir::{Diagnostic, Field, Key, KeyGroup, Schema, Type, TypeDef, TypeKind};
+use korek_ir::{
+    Diagnostic, Field, Key, KeyGroup, Schema, Type, TypeDef, TypeIndex, TypeKind, Types,
+};
 use korek_plugin::{File, GenerateRequest, GenerateResponse, Hook, Item};
 
 /// Generator options.
@@ -109,6 +111,7 @@ fn rules_doc(v: &korek_ir::Validate) -> Vec<String> {
 
 struct Gen<'a> {
     schema: &'a Schema,
+    index: TypeIndex<'a>,
     out: String,
     warnings: Vec<Diagnostic>,
 }
@@ -122,7 +125,8 @@ pub fn generate(
 ) -> (Vec<File>, Vec<Diagnostic>) {
     let mut g = Gen {
         schema,
-        out: String::with_capacity(32 * 1024),
+        index: schema.index(),
+        out: String::with_capacity(4096 + schema.types.len() * 2048),
         warnings: Vec::new(),
     };
     let _ = writeln!(g.out, "// {GENERATED}");
@@ -271,7 +275,7 @@ impl Gen<'_> {
 
     fn validate_impl(&mut self, t: &TypeDef) {
         let mut body = String::new();
-        validate::type_body(self.schema, t, &mut body, &mut self.warnings);
+        validate::type_body(&self.index, t, &mut body, &mut self.warnings);
         let unused = if body.trim().is_empty() {
             "        let _ = (path, errors);\n"
         } else {
@@ -285,8 +289,8 @@ impl Gen<'_> {
     }
 
     fn literal_json(&self, ty: &Type, j: &korek_ir::Json) -> String {
-        resolve(self.schema, ty, j)
-            .map_or_else(|_| "unreachable!()".into(), |v| literal(self.schema, &v))
+        resolve(&self.index, ty, j)
+            .map_or_else(|_| "unreachable!()".into(), |v| literal(&self.index, &v))
     }
 
     fn keys(&mut self, hooks: &[&dyn Hook]) {
@@ -326,7 +330,7 @@ impl Gen<'_> {
         };
         let mut check = String::new();
         validate::value_checks(
-            self.schema,
+            &self.index,
             &k.ty,
             &k.validate,
             "v",
@@ -377,7 +381,7 @@ impl Gen<'_> {
 }
 
 /// A Rust expression building `v`.
-pub fn literal(schema: &Schema, v: &Value) -> String {
+pub fn literal<S: Types + ?Sized>(schema: &S, v: &Value) -> String {
     let lit = |v: &Value| literal(schema, v);
     match v {
         Value::Bool(b) => b.to_string(),

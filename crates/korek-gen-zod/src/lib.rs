@@ -90,7 +90,7 @@ fn ordered(schema: &Schema) -> Vec<&TypeDef> {
         }
     }
     fn visit<'s>(
-        s: &'s Schema,
+        s: &korek_ir::TypeIndex<'s>,
         t: &'s TypeDef,
         done: &mut HashSet<&'s str>,
         out: &mut Vec<&'s TypeDef>,
@@ -105,16 +105,17 @@ fn ordered(schema: &Schema) -> Vec<&TypeDef> {
             TypeKind::Enum(_) => {}
         }
         for n in names {
-            if let Some(d) = s.get(&n) {
+            if let Some(d) = s.def(&n) {
                 visit(s, d, done, out);
             }
         }
         out.push(t);
     }
+    let index = schema.index();
     let mut done = HashSet::new();
     let mut out = Vec::new();
     for t in &schema.types {
-        visit(schema, t, &mut done, &mut out);
+        visit(&index, t, &mut done, &mut out);
     }
     out
 }

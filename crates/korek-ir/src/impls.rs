@@ -22,6 +22,13 @@ pub struct TypeIndex<'a> {
     by_name: std::collections::HashMap<&'a str, &'a TypeDef>,
 }
 
+impl<'a> TypeIndex<'a> {
+    /// [`Types::get`], borrowing from the schema rather than the index.
+    pub fn def(&self, name: &str) -> Option<&'a TypeDef> {
+        self.by_name.get(name).copied()
+    }
+}
+
 impl Types for TypeIndex<'_> {
     fn get(&self, name: &str) -> Option<&TypeDef> {
         self.by_name.get(name).copied()
