@@ -44,6 +44,7 @@
               ./Cargo.toml
               ./Cargo.lock
               ./crates
+              ./examples
             ];
           };
           cargoLock.lockFile = ./Cargo.lock;

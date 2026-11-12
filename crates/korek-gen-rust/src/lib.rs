@@ -132,11 +132,11 @@ pub enum Constraint {
 "#;
 
 const KEYWORDS: &[&str] = &[
-    "as", "async", "await", "break", "const", "continue", "dyn", "else", "enum", "extern",
-    "false", "fn", "for", "gen", "if", "impl", "in", "let", "loop", "match", "mod", "move",
-    "mut", "pub", "ref", "return", "static", "struct", "trait", "true", "type", "unsafe",
-    "use", "where", "while", "abstract", "become", "box", "do", "final", "macro",
-    "override", "priv", "try", "typeof", "unsized", "virtual", "yield",
+    "as", "async", "await", "break", "const", "continue", "dyn", "else", "enum", "extern", "false",
+    "fn", "for", "gen", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
+    "ref", "return", "static", "struct", "trait", "true", "type", "unsafe", "use", "where",
+    "while", "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try",
+    "typeof", "unsized", "virtual", "yield",
 ];
 
 /// A field or module name, raw when it is a keyword.
@@ -306,7 +306,10 @@ fn key_group(out: &mut String, schema: &Schema, g: &KeyGroup, hooks: &[&dyn Hook
             Some(j) => {
                 let v = resolve(schema, &k.ty, j, &Constraints::default());
                 let lit = v.map_or_else(|_| "unreachable!()".into(), |v| literal(schema, &v));
-                (format!("Some(|| {lit})"), format!("Some({:?})", j.to_string()))
+                (
+                    format!("Some(|| {lit})"),
+                    format!("Some({:?})", j.to_string()),
+                )
             }
             None => ("None".into(), "None".into()),
         };

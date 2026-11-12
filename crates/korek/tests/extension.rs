@@ -2,6 +2,10 @@
 //! typed metadata that travels to plugins and a generator hook that adds
 //! output for it.
 
+#![allow(clippy::unwrap_used)]
+
+use core::fmt::Write as _;
+
 use korek_core::diag::Diagnostic;
 use korek_core::ext::{Extension, ItemKind, Literal, Node};
 use korek_core::ir::{Schema, ext_as};
@@ -42,22 +46,31 @@ impl Extension for Settings {
             .args()
             .first()
             .and_then(|a| a.value.as_str().map(str::to_owned))
-            .ok_or_else(|| Diagnostic::error("settings::layer", "`layer` needs a name").at(node.span(), "here"))?;
+            .ok_or_else(|| {
+                Diagnostic::error("settings::layer", "`layer` needs a name").at(node.span(), "here")
+            })?;
         Ok(serde_json::to_value(Layer { name }).unwrap())
     }
 
     fn child(&self, _: ItemKind, node: Node<'_>) -> Result<serde_json::Value, Diagnostic> {
         let layers = node
             .prop("layers")
-            .and_then(|a| a.value.as_str().map(|s| s.split_whitespace().map(str::to_owned).collect()))
+            .and_then(|a| {
+                a.value
+                    .as_str()
+                    .map(|s| s.split_whitespace().map(str::to_owned).collect())
+            })
             .unwrap_or_default();
         let merge = match node.prop("merge") {
             None => "replace".to_owned(),
             Some(a) => match &a.value {
                 Literal::String(s) if s == "replace" || s == "append" => s.clone(),
                 _ => {
-                    return Err(Diagnostic::error("settings::merge", "merge must be replace or append")
-                        .at(a.span, "bad merge"));
+                    return Err(Diagnostic::error(
+                        "settings::merge",
+                        "merge must be replace or append",
+                    )
+                    .at(a.span, "bad merge"));
                 }
             },
         };
@@ -70,10 +83,17 @@ impl Extension for Settings {
         for g in &schema.keys {
             for k in &g.keys {
                 for s in ext_as::<Setting>(&k.ext, "settings").unwrap() {
-                    for l in s.layers.iter().filter(|l| !layers.iter().any(|x| &x.name == *l)) {
+                    for l in s
+                        .layers
+                        .iter()
+                        .filter(|l| !layers.iter().any(|x| &x.name == *l))
+                    {
                         out.push(
-                            Diagnostic::error("settings::unknown_layer", format!("unknown layer `{l}`"))
-                                .at(k.span, "in this key"),
+                            Diagnostic::error(
+                                "settings::unknown_layer",
+                                format!("unknown layer `{l}`"),
+                            )
+                            .at(k.span, "in this key"),
                         );
                     }
                 }
@@ -133,7 +153,13 @@ fn extension_errors_have_spans() {
     assert!(f.has("settings::unknown_layer"), "{f}");
     // Without the extension, the nodes are unknown.
     let f = Loader::new()
-        .load_sources(vec![SourceFile { path: "s.kdl".into(), contents: SCHEMA.into() }], None)
+        .load_sources(
+            vec![SourceFile {
+                path: "s.kdl".into(),
+                contents: SCHEMA.into(),
+            }],
+            None,
+        )
         .unwrap_err();
     assert!(f.has("korek::unknown_node"), "{f}");
 }
@@ -146,11 +172,12 @@ impl Hook for LayerConsts {
         if let Item::Key(_, k) = item {
             for s in ext_as::<Setting>(&k.ext, "settings").unwrap() {
                 let layers: Vec<String> = s.layers.iter().map(|l| format!("{l:?}")).collect();
-                out.push_str(&format!(
-                    "    pub const {}_LAYERS: &[&str] = &[{}];\n",
+                let _ = writeln!(
+                    out,
+                    "    pub const {}_LAYERS: &[&str] = &[{}];",
                     k.ident().to_uppercase(),
                     layers.join(", ")
-                ));
+                );
             }
         }
     }
@@ -164,7 +191,11 @@ impl Hook for LayerConsts {
 #[test]
 fn generator_hooks_add_output() {
     let schema = load(SCHEMA).unwrap().schema;
-    let files = korek_gen_rust::generate(&schema, &korek_gen_rust::Options::default(), &[&LayerConsts]);
+    let files = korek_gen_rust::generate(
+        &schema,
+        &korek_gen_rust::Options::default(),
+        &[&LayerConsts],
+    );
     assert_eq!(files.len(), 2);
     assert!(
         files[0]

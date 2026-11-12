@@ -100,7 +100,12 @@ impl Validator<'_> {
             match &t.kind {
                 TypeKind::Enum(e) => {
                     if e.variants.is_empty() {
-                        self.diags.push(err("korek::empty", format!("enum `{}` has no variants", t.name), self.name_span(t.span), "add a variant"));
+                        self.diags.push(err(
+                            "korek::empty",
+                            format!("enum `{}` has no variants", t.name),
+                            self.name_span(t.span),
+                            "add a variant",
+                        ));
                     }
                     for v in &e.variants {
                         self.snake(&v.name, v.span, "variant");
@@ -118,13 +123,23 @@ impl Validator<'_> {
                         self.snake(&f.name, f.span, "field");
                         self.dup(&mut seen, &f.name, f.span, "field");
                         if NOT_RAW.contains(&f.name.as_str()) {
-                            self.diags.push(err("korek::bad_name", format!("`{}` cannot be a field name", f.name), self.name_span(f.span), "reserved in Rust"));
+                            self.diags.push(err(
+                                "korek::bad_name",
+                                format!("`{}` cannot be a field name", f.name),
+                                self.name_span(f.span),
+                                "reserved in Rust",
+                            ));
                         }
                     }
                 }
                 TypeKind::Union(u) => {
                     if u.variants.is_empty() {
-                        self.diags.push(err("korek::empty", format!("union `{}` has no variants", t.name), self.name_span(t.span), "add a variant"));
+                        self.diags.push(err(
+                            "korek::empty",
+                            format!("union `{}` has no variants", t.name),
+                            self.name_span(t.span),
+                            "add a variant",
+                        ));
                     }
                     for v in &u.variants {
                         self.snake(&v.name, v.span, "variant");
@@ -142,8 +157,28 @@ impl Validator<'_> {
                 self.dup(&mut seen, &r.name, r.span, "rpc");
             }
         }
+        self.names_keys(&top);
+        let used = used_types(self.schema).into_iter().map(|(t, o, _)| (t, o));
+        for w in naming::proto_wrappers(used) {
+            let name = naming::proto_wrapper(&w);
+            if let Some(at) = top.get(&name) {
+                let at = *at;
+                self.diags.push(err(
+                    "korek::name_clash",
+                    format!(
+                        "`{name}` is the Protobuf wrapper korek generates for `{}`",
+                        w.display()
+                    ),
+                    at,
+                    "rename this type",
+                ));
+            }
+        }
+    }
+
+    fn names_keys(&mut self, top: &HashMap<String, Span>) {
         let mut groups = HashMap::new();
-        for g in &s.keys {
+        for g in &self.schema.keys {
             self.dotted(&g.name, g.span, "keys block");
             self.dup(&mut groups, &g.ident(), g.span, "keys block");
             let generated = naming::keys_type(g);
@@ -157,22 +192,24 @@ impl Validator<'_> {
             let mut seen = HashMap::new();
             for k in &g.keys {
                 self.dotted(&k.name, k.span, "key");
-                self.dup(&mut seen, &k.ident(), k.span, "key (dots count as underscores)");
-            }
-        }
-        let used = used_types(self.schema).into_iter().map(|(t, o, _)| (t, o));
-        for w in naming::proto_wrappers(used) {
-            let name = naming::proto_wrapper(&w);
-            if let Some(at) = top.get(&name) {
-                let at = *at;
-                self.diags.push(err("korek::name_clash", format!("`{name}` is the Protobuf wrapper korek generates for `{}`", w.display()), at, "rename this type"));
+                self.dup(
+                    &mut seen,
+                    &k.ident(),
+                    k.span,
+                    "key (dots count as underscores)",
+                );
             }
         }
     }
 
     fn unknown(&mut self, name: &str, at: Span) {
         let names = self.schema.types.iter().map(|t| t.name.as_str());
-        let mut d = err("korek::unknown_type", format!("unknown type `{name}`"), at, "not declared");
+        let mut d = err(
+            "korek::unknown_type",
+            format!("unknown type `{name}`"),
+            at,
+            "not declared",
+        );
         if let Some(best) = suggest(name, names) {
             d = d.help(format!("did you mean `{best}`?"));
         }
@@ -195,7 +232,10 @@ impl Validator<'_> {
         }
         for svc in &self.schema.services {
             for r in &svc.rpcs {
-                for (name, at) in [(&r.input, self.aux.ty_span.get(&r.span)), (&r.output, self.aux.out_span.get(&r.span))] {
+                for (name, at) in [
+                    (&r.input, self.aux.ty_span.get(&r.span)),
+                    (&r.output, self.aux.out_span.get(&r.span)),
+                ] {
                     let at = at.copied().unwrap_or(r.span);
                     match self.schema.get(name).map(|t| &t.kind) {
                         None => self.unknown(name, at),
@@ -209,7 +249,9 @@ impl Validator<'_> {
 
     fn unions(&mut self) {
         for t in &self.schema.types {
-            let TypeKind::Union(u) = &t.kind else { continue };
+            let TypeKind::Union(u) = &t.kind else {
+                continue;
+            };
             let Some(tag) = &u.tag else { continue };
             for v in &u.variants {
                 let at = self.aux.ty_span.get(&v.span).copied().unwrap_or(v.span);
@@ -220,12 +262,31 @@ impl Validator<'_> {
                 match target.map(|t| &t.kind) {
                     Some(TypeKind::Struct(s)) => {
                         if s.fields.iter().any(|f| &f.name == tag) {
-                            self.diags.push(err("korek::tag_clash", format!("struct `{}` has a field `{tag}`, the tag of union `{}`", v.ty.display(), t.name), at, "clashes with the tag"));
+                            self.diags.push(err(
+                                "korek::tag_clash",
+                                format!(
+                                    "struct `{}` has a field `{tag}`, the tag of union `{}`",
+                                    v.ty.display(),
+                                    t.name
+                                ),
+                                at,
+                                "clashes with the tag",
+                            ));
                         }
                     }
                     _ => self.diags.push(
-                        err("korek::bad_union", format!("variant `{}` of tagged union `{}` must be a struct, found `{}`", v.name, t.name, v.ty.display()), at, "not a struct")
-                            .help("remove `tag=` for an untagged union of any types"),
+                        err(
+                            "korek::bad_union",
+                            format!(
+                                "variant `{}` of tagged union `{}` must be a struct, found `{}`",
+                                v.name,
+                                t.name,
+                                v.ty.display()
+                            ),
+                            at,
+                            "not a struct",
+                        )
+                        .help("remove `tag=` for an untagged union of any types"),
                     ),
                 }
             }
@@ -255,30 +316,6 @@ impl Validator<'_> {
         // 0 = unvisited, 1 = on the stack, 2 = done.
         let mut state: HashMap<&str, u8> = HashMap::new();
         let mut reported = false;
-        fn visit<'s>(s: &'s Schema, name: &'s str, state: &mut HashMap<&'s str, u8>, edges: &dyn Fn(&crate::ir::TypeDef) -> Vec<String>, path: &mut Vec<&'s str>) -> Option<Vec<String>> {
-            match state.get(name) {
-                Some(2) => return None,
-                Some(1) => {
-                    let start = path.iter().position(|p| *p == name).unwrap_or(0);
-                    let mut cycle: Vec<String> = path[start..].iter().map(|s| (*s).to_owned()).collect();
-                    cycle.push(name.to_owned());
-                    return Some(cycle);
-                }
-                _ => {}
-            }
-            let def = s.get(name)?;
-            state.insert(name, 1);
-            path.push(&def.name);
-            for e in edges(def) {
-                let Some(target) = s.get(&e) else { continue };
-                if let Some(c) = visit(s, &target.name, state, edges, path) {
-                    return Some(c);
-                }
-            }
-            path.pop();
-            state.insert(name, 2);
-            None
-        }
         for t in &s.types {
             if reported {
                 break;
@@ -286,9 +323,15 @@ impl Validator<'_> {
             if let Some(cycle) = visit(s, &t.name, &mut state, &edges, &mut Vec::new()) {
                 reported = true;
                 let at = s.get(&cycle[0]).map_or(t.span, |d| self.name_span(d.span));
-                self.diags.push(
-                    err("korek::recursive_type", format!("recursive types are not supported yet: {}", cycle.join(" → ")), at, "part of the cycle")
-                );
+                self.diags.push(err(
+                    "korek::recursive_type",
+                    format!(
+                        "recursive types are not supported yet: {}",
+                        cycle.join(" → ")
+                    ),
+                    at,
+                    "part of the cycle",
+                ));
             }
         }
     }
@@ -301,7 +344,12 @@ impl Validator<'_> {
         let ty_name = ty.display();
         let mut bad = |what: &str, ok: bool| {
             if !ok {
-                self.diags.push(err("korek::bad_constraint", format!("`{what}` does not apply to `{ty_name}`"), at, "here"));
+                self.diags.push(err(
+                    "korek::bad_constraint",
+                    format!("`{what}` does not apply to `{ty_name}`"),
+                    at,
+                    "here",
+                ));
             }
         };
         bad("min", c.min.is_none() || ty.is_numeric());
@@ -311,19 +359,39 @@ impl Validator<'_> {
         bad("pattern", c.pattern.is_none() || *ty == Type::String);
         if let (Some(a), Some(b)) = (c.min, c.max) {
             if a > b {
-                self.diags.push(err("korek::bad_constraint", format!("min {a} is above max {b}"), at, "empty range"));
+                self.diags.push(err(
+                    "korek::bad_constraint",
+                    format!("min {a} is above max {b}"),
+                    at,
+                    "empty range",
+                ));
             }
         }
         if let (Some(a), Some(b)) = (c.min_len, c.max_len) {
             if a > b {
-                self.diags.push(err("korek::bad_constraint", format!("min_len {a} is above max_len {b}"), at, "empty range"));
+                self.diags.push(err(
+                    "korek::bad_constraint",
+                    format!("min_len {a} is above max_len {b}"),
+                    at,
+                    "empty range",
+                ));
             }
         }
         if let Some(Err(e)) = c.pattern.as_deref().map(regex::Regex::new) {
-            self.diags.push(err("korek::bad_constraint", format!("invalid pattern: {e}"), at, "here"));
+            self.diags.push(err(
+                "korek::bad_constraint",
+                format!("invalid pattern: {e}"),
+                at,
+                "here",
+            ));
         }
         if *ty == Type::U64 && c.min.is_some_and(|m| m < 0.0) {
-            self.diags.push(err("korek::bad_constraint", "a u64 cannot have a negative min", at, "here"));
+            self.diags.push(err(
+                "korek::bad_constraint",
+                "a u64 cannot have a negative min",
+                at,
+                "here",
+            ));
         }
     }
 
@@ -347,13 +415,25 @@ impl Validator<'_> {
         let mut resolved = Vec::new();
         for g in &self.schema.keys {
             for k in &g.keys {
-                let Some(arg) = self.aux.default.get(&k.span) else { continue };
+                let Some(arg) = self.aux.default.get(&k.span) else {
+                    continue;
+                };
                 match default_json(&k.ty, self.schema, &arg.value) {
                     Ok(j) => match resolve(self.schema, &k.ty, &j, &k.constraints) {
                         Ok(v) => resolved.push((k.span, v.to_json())),
-                        Err(e) => self.diags.push(err("korek::bad_default", format!("bad default for `{}` ({}): {e}", k.name, k.ty.display()), arg.span, "this default")),
+                        Err(e) => self.diags.push(err(
+                            "korek::bad_default",
+                            format!("bad default for `{}` ({}): {e}", k.name, k.ty.display()),
+                            arg.span,
+                            "this default",
+                        )),
                     },
-                    Err(e) => self.diags.push(err("korek::bad_default", format!("bad default for `{}` ({}): {e}", k.name, k.ty.display()), arg.span, "this default")),
+                    Err(e) => self.diags.push(err(
+                        "korek::bad_default",
+                        format!("bad default for `{}` ({}): {e}", k.name, k.ty.display()),
+                        arg.span,
+                        "this default",
+                    )),
                 }
             }
         }
@@ -378,6 +458,38 @@ fn used_types(schema: &Schema) -> Vec<(&Type, bool, Span)> {
     out
 }
 
+#[allow(clippy::type_complexity)]
+fn visit<'s>(
+    s: &'s Schema,
+    name: &'s str,
+    state: &mut HashMap<&'s str, u8>,
+    edges: &dyn Fn(&crate::ir::TypeDef) -> Vec<String>,
+    path: &mut Vec<&'s str>,
+) -> Option<Vec<String>> {
+    match state.get(name) {
+        Some(2) => return None,
+        Some(1) => {
+            let start = path.iter().position(|p| *p == name).unwrap_or(0);
+            let mut cycle: Vec<String> = path[start..].iter().map(|s| (*s).to_owned()).collect();
+            cycle.push(name.to_owned());
+            return Some(cycle);
+        }
+        _ => {}
+    }
+    let def = s.get(name)?;
+    state.insert(name, 1);
+    path.push(&def.name);
+    for e in edges(def) {
+        let Some(target) = s.get(&e) else { continue };
+        if let Some(c) = visit(s, &target.name, state, edges, path) {
+            return Some(c);
+        }
+    }
+    path.pop();
+    state.insert(name, 2);
+    None
+}
+
 /// A key default as JSON: native values for scalars and enums, a JSON
 /// string for lists, maps, bytes, structs and unions (an untagged union also
 /// takes a native value, or a string that is not JSON as itself).
@@ -395,7 +507,10 @@ fn default_json(ty: &Type, schema: &Schema, lit: &Literal) -> Result<serde_json:
         (Some(lenient), Literal::String(s)) => match serde_json::from_str(s) {
             Ok(j) => Ok(j),
             Err(_) if lenient => Ok(serde_json::Value::String(s.clone())),
-            Err(e) => Err(format!("expected a JSON string for a {}: {e}", ty.display())),
+            Err(e) => Err(format!(
+                "expected a JSON string for a {}: {e}",
+                ty.display()
+            )),
         },
         _ => Ok(lit.to_json()),
     }

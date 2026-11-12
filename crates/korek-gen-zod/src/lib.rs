@@ -59,7 +59,12 @@ fn ordered(schema: &Schema) -> Vec<&TypeDef> {
             _ => {}
         }
     }
-    fn visit<'s>(s: &'s Schema, t: &'s TypeDef, done: &mut HashSet<&'s str>, out: &mut Vec<&'s TypeDef>) {
+    fn visit<'s>(
+        s: &'s Schema,
+        t: &'s TypeDef,
+        done: &mut HashSet<&'s str>,
+        out: &mut Vec<&'s TypeDef>,
+    ) {
         if !done.insert(&t.name) {
             return;
         }
@@ -126,7 +131,11 @@ pub fn zod(ty: &Type, c: &Constraints) -> String {
         }
     }
     if let Some(p) = &c.pattern {
-        let _ = write!(e, ".regex(new RegExp({}))", serde_json::Value::from(p.as_str()));
+        let _ = write!(
+            e,
+            ".regex(new RegExp({}))",
+            serde_json::Value::from(p.as_str())
+        );
     }
     e
 }
@@ -150,7 +159,7 @@ pub fn generate(schema: &Schema, opts: &Options, hooks: &[&dyn Hook]) -> Vec<Fil
     let mut out = format!("// {GENERATED}\nimport {{ z }} from {:?};\n", opts.import);
     for t in ordered(schema) {
         out.push('\n');
-        type_def(schema, &mut out, t);
+        type_def(&mut out, t);
         for h in hooks {
             h.after(Item::Type(t), &mut out);
         }
@@ -204,50 +213,58 @@ pub fn generate(schema: &Schema, opts: &Options, hooks: &[&dyn Hook]) -> Vec<Fil
     files
 }
 
-fn type_def(schema: &Schema, out: &mut String, t: &TypeDef) {
+fn type_def(out: &mut String, t: &TypeDef) {
     let name = &t.name;
     jsdoc(out, "", t.doc.as_deref());
     match &t.kind {
         TypeKind::Enum(e) => {
             let vs: Vec<String> = e.variants.iter().map(|v| format!("{:?}", v.name)).collect();
-            let _ = writeln!(out, "export const {name}Schema = z.enum([{}]);", vs.join(", "));
+            let _ = writeln!(
+                out,
+                "export const {name}Schema = z.enum([{}]);",
+                vs.join(", ")
+            );
         }
         TypeKind::Struct(s) => {
             let _ = writeln!(out, "export const {name}Schema = z.object({{");
             for f in &s.fields {
                 jsdoc(out, "  ", f.doc.as_deref());
                 let opt = if f.optional { ".optional()" } else { "" };
-                let _ = writeln!(out, "  {}: {}{opt},", prop(&f.name), zod(&f.ty, &f.constraints));
+                let _ = writeln!(
+                    out,
+                    "  {}: {}{opt},",
+                    prop(&f.name),
+                    zod(&f.ty, &f.constraints)
+                );
             }
             out.push_str("});\n");
         }
         TypeKind::Union(u) => {
-            match &u.tag {
-                Some(tag) => {
-                    let _ = writeln!(out, "export const {name}Schema = z.discriminatedUnion({tag:?}, [");
-                    for v in &u.variants {
-                        jsdoc(out, "  ", v.doc.as_deref());
-                        let _ = writeln!(
-                            out,
-                            "  {}.extend({{ {}: z.literal({:?}) }}),",
-                            zod(&v.ty, &Constraints::default()),
-                            prop(tag),
-                            v.name
-                        );
-                    }
+            if let Some(tag) = &u.tag {
+                let _ = writeln!(
+                    out,
+                    "export const {name}Schema = z.discriminatedUnion({tag:?}, ["
+                );
+                for v in &u.variants {
+                    jsdoc(out, "  ", v.doc.as_deref());
+                    let _ = writeln!(
+                        out,
+                        "  {}.extend({{ {}: z.literal({:?}) }}),",
+                        zod(&v.ty, &Constraints::default()),
+                        prop(tag),
+                        v.name
+                    );
                 }
-                None => {
-                    let _ = writeln!(out, "export const {name}Schema = z.union([");
-                    for v in &u.variants {
-                        jsdoc(out, "  ", v.doc.as_deref());
-                        let _ = writeln!(out, "  {},", zod(&v.ty, &Constraints::default()));
-                    }
+            } else {
+                let _ = writeln!(out, "export const {name}Schema = z.union([");
+                for v in &u.variants {
+                    jsdoc(out, "  ", v.doc.as_deref());
+                    let _ = writeln!(out, "  {},", zod(&v.ty, &Constraints::default()));
                 }
             }
             out.push_str("]);\n");
         }
         _ => {}
     }
-    let _ = schema;
     let _ = writeln!(out, "export type {name} = z.infer<typeof {name}Schema>;");
 }

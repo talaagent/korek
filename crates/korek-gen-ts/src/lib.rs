@@ -41,7 +41,7 @@ pub fn plugin(req: &GenerateRequest) -> Result<GenerateResponse, Diagnostic> {
     Ok(GenerateResponse::new(generate(&req.schema, &opts, &[])))
 }
 
-/// Writes a JSDoc comment.
+/// Writes a `JSDoc` comment.
 pub fn jsdoc(out: &mut String, indent: &str, doc: Option<&str>) {
     let Some(doc) = doc else { return };
     let lines: Vec<&str> = doc.lines().collect();
@@ -158,7 +158,9 @@ fn type_def(out: &mut String, t: &TypeDef) {
             for (i, v) in u.variants.iter().enumerate() {
                 jsdoc(out, "  ", v.doc.as_deref());
                 let ty = match &u.tag {
-                    Some(tag) => format!("({{ {}: {:?} }} & {})", prop(tag), v.name, ts_type(&v.ty)),
+                    Some(tag) => {
+                        format!("({{ {}: {:?} }} & {})", prop(tag), v.name, ts_type(&v.ty))
+                    }
                     None => ts_type(&v.ty),
                 };
                 let end = if i + 1 == n { ";" } else { "" };

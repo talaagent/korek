@@ -32,7 +32,11 @@ fn generated_proto_passes_buf() {
     }
     let dir = example().join("gen/proto");
     for args in [&["lint"][..], &["build", "-o", "/dev/null"][..]] {
-        let out = Command::new("buf").args(args).current_dir(&dir).output().unwrap();
+        let out = Command::new("buf")
+            .args(args)
+            .current_dir(&dir)
+            .output()
+            .unwrap();
         assert!(
             out.status.success(),
             "buf {args:?} failed:\n{}{}",
@@ -60,9 +64,16 @@ fn generated_proto_without_protovalidate_passes_protoc() {
     assert!(!text.contains("buf.validate"), "{text}");
     let out = Command::new("protoc")
         .arg(format!("--proto_path={}", tmp.path().display()))
-        .arg(format!("--descriptor_set_out={}", tmp.path().join("out.pb").display()))
+        .arg(format!(
+            "--descriptor_set_out={}",
+            tmp.path().join("out.pb").display()
+        ))
         .arg("example/v1/types.proto")
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }

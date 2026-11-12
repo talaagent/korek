@@ -60,7 +60,10 @@ impl Lock {
                 Diagnostic::error("korek::lock", format!("malformed lockfile entry: {what}"))
                     .at(node.span(), "here")
             };
-            let Some(name) = node.args().first().and_then(|a| a.value.as_str().map(str::to_owned))
+            let Some(name) = node
+                .args()
+                .first()
+                .and_then(|a| a.value.as_str().map(str::to_owned))
             else {
                 diags.push(bad("expected `<kind> \"<Name>\" { … }`"));
                 continue;
@@ -71,9 +74,10 @@ impl Lock {
                 .or_default();
             for item in node.children() {
                 let args = item.args();
-                let (Some(Literal::String(k)), Some(Literal::Int(v))) =
-                    (args.first().map(|a| &a.value), args.get(1).map(|a| &a.value))
-                else {
+                let (Some(Literal::String(k)), Some(Literal::Int(v))) = (
+                    args.first().map(|a| &a.value),
+                    args.get(1).map(|a| &a.value),
+                ) else {
                     diags.push(bad("expected `item \"name\" <number>`"));
                     continue;
                 };
@@ -91,7 +95,11 @@ impl Lock {
                 };
             }
         }
-        if diags.is_empty() { Ok(lock) } else { Err(diags) }
+        if diags.is_empty() {
+            Ok(lock)
+        } else {
+            Err(diags)
+        }
     }
 
     /// The lockfile text.
@@ -119,11 +127,10 @@ impl Lock {
     }
 }
 
-/// An item to number: its name, explicit id, and where it is.
+/// An item to number: its name and explicit id.
 struct Item {
     name: String,
     id: Option<(u32, Span)>,
-    span: Span,
 }
 
 const PROTO_RESERVED: core::ops::RangeInclusive<u32> = 19_000..=19_999;
@@ -131,7 +138,6 @@ const PROTO_RESERVED: core::ops::RangeInclusive<u32> = 19_000..=19_999;
 fn number_scope(
     items: &[Item],
     old: Option<&Scope>,
-    is_enum: bool,
     diags: &mut Vec<Diagnostic>,
 ) -> (Vec<u32>, Scope) {
     let empty = Scope::default();
@@ -145,12 +151,18 @@ fn number_scope(
     // Explicit ids first, then locked ones, then fresh numbers.
     for (i, it) in items.iter().enumerate() {
         let Some((id, id_span)) = it.id else { continue };
-        let locked = old.items.get(&it.name).or_else(|| old.retired.get(&it.name));
+        let locked = old
+            .items
+            .get(&it.name)
+            .or_else(|| old.retired.get(&it.name));
         if let Some(l) = locked.filter(|l| **l != id) {
             diags.push(
                 Diagnostic::error(
                     "korek::renumbered",
-                    format!("`{}` is pinned to id={id} but korek.lock records {l}", it.name),
+                    format!(
+                        "`{}` is pinned to id={id} but korek.lock records {l}",
+                        it.name
+                    ),
                 )
                 .at(id_span, "differs from the lockfile")
                 .help("numbers never change silently: edit korek.lock to renumber on purpose"),
@@ -184,19 +196,16 @@ fn number_scope(
         if numbers[i] != 0 {
             continue;
         }
-        let locked = old.items.get(&it.name).or_else(|| old.retired.get(&it.name));
+        let locked = old
+            .items
+            .get(&it.name)
+            .or_else(|| old.retired.get(&it.name));
         if let Some(l) = locked.filter(|l| !taken.contains_key(l)) {
             numbers[i] = *l;
             taken.insert(*l, &it.name);
         }
     }
-    let mut next = used
-        .keys()
-        .chain(taken.keys())
-        .copied()
-        .max()
-        .unwrap_or(0)
-        + 1;
+    let mut next = used.keys().chain(taken.keys()).copied().max().unwrap_or(0) + 1;
     for (i, it) in items.iter().enumerate() {
         if numbers[i] != 0 {
             continue;
@@ -206,9 +215,7 @@ fn number_scope(
         }
         numbers[i] = next;
         taken.insert(next, &it.name);
-        let _ = it.span;
     }
-    let _ = is_enum;
     let mut scope = Scope::default();
     for (it, n) in items.iter().zip(&numbers) {
         scope.items.insert(it.name.clone(), *n);
@@ -245,27 +252,44 @@ pub(crate) fn assign(
     let item = |name: &str, span: Span| Item {
         name: name.to_owned(),
         id: ids.get(&span).copied(),
-        span,
     };
     for t in &mut schema.types {
         let (kind, items): (&str, Vec<Item>) = match &t.kind {
-            TypeKind::Enum(e) => ("enum", e.variants.iter().map(|v| item(&v.name, v.span)).collect()),
-            TypeKind::Struct(s) => ("struct", s.fields.iter().map(|f| item(&f.name, f.span)).collect()),
-            TypeKind::Union(u) => ("union", u.variants.iter().map(|v| item(&v.name, v.span)).collect()),
+            TypeKind::Enum(e) => (
+                "enum",
+                e.variants.iter().map(|v| item(&v.name, v.span)).collect(),
+            ),
+            TypeKind::Struct(s) => (
+                "struct",
+                s.fields.iter().map(|f| item(&f.name, f.span)).collect(),
+            ),
+            TypeKind::Union(u) => (
+                "union",
+                u.variants.iter().map(|v| item(&v.name, v.span)).collect(),
+            ),
         };
         let key = (kind.to_owned(), t.name.clone());
-        let (nums, scope) = number_scope(&items, old.scopes.get(&key), kind == "enum", diags);
+        let (nums, scope) = number_scope(&items, old.scopes.get(&key), diags);
         match &mut t.kind {
             TypeKind::Enum(e) => {
-                e.variants.iter_mut().zip(&nums).for_each(|(v, n)| v.number = *n);
+                e.variants
+                    .iter_mut()
+                    .zip(&nums)
+                    .for_each(|(v, n)| v.number = *n);
                 e.retired = retired(&scope);
             }
             TypeKind::Struct(s) => {
-                s.fields.iter_mut().zip(&nums).for_each(|(f, n)| f.number = *n);
+                s.fields
+                    .iter_mut()
+                    .zip(&nums)
+                    .for_each(|(f, n)| f.number = *n);
                 s.retired = retired(&scope);
             }
             TypeKind::Union(u) => {
-                u.variants.iter_mut().zip(&nums).for_each(|(v, n)| v.number = *n);
+                u.variants
+                    .iter_mut()
+                    .zip(&nums)
+                    .for_each(|(v, n)| v.number = *n);
                 u.retired = retired(&scope);
             }
         }
@@ -274,8 +298,11 @@ pub(crate) fn assign(
     for g in &mut schema.keys {
         let items: Vec<Item> = g.keys.iter().map(|k| item(&k.name, k.span)).collect();
         let key = ("keys".to_owned(), g.name.clone());
-        let (nums, scope) = number_scope(&items, old.scopes.get(&key), false, diags);
-        g.keys.iter_mut().zip(&nums).for_each(|(k, n)| k.number = *n);
+        let (nums, scope) = number_scope(&items, old.scopes.get(&key), diags);
+        g.keys
+            .iter_mut()
+            .zip(&nums)
+            .for_each(|(k, n)| k.number = *n);
         g.retired = retired(&scope);
         new.scopes.insert(key, scope);
     }

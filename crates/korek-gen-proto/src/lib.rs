@@ -4,7 +4,7 @@
 //! - enums get a `<ENUM>_UNSPECIFIED = 0` value and prefixed value names;
 //! - structs become messages, unions messages with a `oneof value`;
 //! - each keys block becomes a `<Group>Keys` message of `optional` fields;
-//! - services become `service` blocks for ConnectRPC / gRPC plugins;
+//! - services become `service` blocks for `ConnectRPC` / gRPC plugins;
 //! - every constraint becomes a protovalidate (`buf.validate`) rule.
 //!
 //! Field numbers come from the IR (pinned by `id=` or `korek.lock`). Lists
@@ -325,7 +325,13 @@ impl Gen<'_> {
         }
         for v in &u.variants {
             doc_lines(&mut self.out, "    ", "// ", v.doc.as_deref());
-            let _ = writeln!(self.out, "    {} {} = {};", element(&v.ty), v.name, v.number);
+            let _ = writeln!(
+                self.out,
+                "    {} {} = {};",
+                element(&v.ty),
+                v.name,
+                v.number
+            );
         }
         self.out.push_str("  }\n");
         reserved(&mut self.out, &u.retired, str::to_owned);
@@ -383,14 +389,21 @@ impl Gen<'_> {
         let _ = writeln!(self.out, "service {} {{", svc.name);
         for r in &svc.rpcs {
             doc_lines(&mut self.out, "  ", "// ", r.doc.as_deref());
-            let _ = write!(self.out, "  rpc {}({}) returns ({})", r.name, r.input, r.output);
+            let _ = write!(
+                self.out,
+                "  rpc {}({}) returns ({})",
+                r.name, r.input, r.output
+            );
             match r.idempotency {
                 Some(i) => {
                     let level = match i {
                         Idempotency::NoSideEffects => "NO_SIDE_EFFECTS",
                         Idempotency::Idempotent => "IDEMPOTENT",
                     };
-                    let _ = writeln!(self.out, " {{\n    option idempotency_level = {level};\n  }}");
+                    let _ = writeln!(
+                        self.out,
+                        " {{\n    option idempotency_level = {level};\n  }}"
+                    );
                 }
                 None => self.out.push_str(";\n"),
             }

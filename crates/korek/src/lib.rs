@@ -111,7 +111,10 @@ pub enum Error {
     },
     /// `check`: generated files differ from disk.
     Stale(Vec<PathBuf>),
-    Io { path: PathBuf, error: std::io::Error },
+    Io {
+        path: PathBuf,
+        error: std::io::Error,
+    },
 }
 
 impl fmt::Display for Error {
@@ -222,7 +225,7 @@ impl Driver {
         };
         let path = self.find(&out.plugin)?;
         let enc = Encoding::Json;
-        let input = enc.encode(req).map_err(&fail)?;
+        let input = enc.encode(req).map_err(fail)?;
         let mut child = Command::new(&path)
             .env(ENCODING_ENV, enc.name())
             .stdin(Stdio::piped())
@@ -279,10 +282,14 @@ impl Driver {
             }
             for f in resp.files {
                 let rel = Path::new(&f.path);
-                if rel.is_absolute() || rel.components().any(|c| !matches!(c, Component::Normal(_))) {
+                if rel.is_absolute() || rel.components().any(|c| !matches!(c, Component::Normal(_)))
+                {
                     return Err(Error::Plugin {
                         plugin: out.plugin.clone(),
-                        message: format!("refusing to write outside the output directory: {}", f.path),
+                        message: format!(
+                            "refusing to write outside the output directory: {}",
+                            f.path
+                        ),
                     });
                 }
                 files.push((out.plugin.clone(), out.dir.join(rel), f.content));

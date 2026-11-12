@@ -20,12 +20,18 @@ fn tagged_union_round_trips() {
 
 #[test]
 fn untagged_union_and_enum() {
-    assert_eq!(serde_json::from_value::<Limit>(json!(5)).unwrap(), Limit::Count(5));
+    assert_eq!(
+        serde_json::from_value::<Limit>(json!(5)).unwrap(),
+        Limit::Count(5)
+    );
     assert_eq!(
         serde_json::from_value::<Limit>(json!("max")).unwrap(),
         Limit::Preset("max".into())
     );
-    assert_eq!(serde_json::to_value(Backend::Codex).unwrap(), json!("codex"));
+    assert_eq!(
+        serde_json::to_value(Backend::Codex).unwrap(),
+        json!("codex")
+    );
 }
 
 #[test]

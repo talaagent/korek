@@ -1,6 +1,8 @@
 //! The `korek` CLI.
 
-use std::collections::BTreeMap;
+extern crate alloc;
+
+use alloc::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -20,7 +22,7 @@ struct GenArgs {
     builtin: Vec<(&'static str, Option<PathBuf>, Option<String>)>,
     outs: Vec<String>,
     plugins: Vec<String>,
-    opts: Vec<String>,
+    plugin_opts: Vec<String>,
     check: bool,
     common: Common,
 }
@@ -45,7 +47,10 @@ fn common_args() -> impl Parser<Common> {
     construct!(Common { exts, lock, dir })
 }
 
-fn builtin(name: &'static str, what: &'static str) -> impl Parser<(&'static str, Option<PathBuf>, Option<String>)> {
+fn builtin(
+    name: &'static str,
+    what: &'static str,
+) -> impl Parser<(&'static str, Option<PathBuf>, Option<String>)> {
     let dir = long(name).help(what).argument::<PathBuf>("DIR").optional();
     let opt_name: &'static str = Box::leak(format!("{name}_opt").into_boxed_str());
     let opt = long(opt_name)
@@ -69,7 +74,7 @@ fn parser() -> impl Parser<Cmd> {
         .help("Use PATH as the binary for plugin NAME")
         .argument::<String>("NAME=PATH")
         .many();
-    let opts = long("opt")
+    let plugin_opts = long("opt")
         .help("Options for plugin NAME")
         .argument::<String>("NAME:k=v[,k=v]")
         .many();
@@ -77,11 +82,18 @@ fn parser() -> impl Parser<Cmd> {
         .help("Fail if any generated file is out of date; write nothing")
         .switch();
     let common = common_args();
-    let gen_cmd = construct!(GenArgs { builtin, outs, plugins, opts, check, common })
-        .map(Cmd::Gen)
-        .to_options()
-        .descr("Generate code from a schema directory")
-        .command("gen");
+    let gen_cmd = construct!(GenArgs {
+        builtin,
+        outs,
+        plugins,
+        plugin_opts,
+        check,
+        common
+    })
+    .map(Cmd::Gen)
+    .to_options()
+    .descr("Generate code from a schema directory")
+    .command("gen");
     let check_cmd = common_args()
         .map(Cmd::Check)
         .to_options()
@@ -138,7 +150,7 @@ fn gen_driver(a: &GenArgs) -> Result<Driver, String> {
         d = d.plugin(n, path);
     }
     let mut extra: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
-    for o in &a.opts {
+    for o in &a.plugin_opts {
         let (n, kv) = split_pair(o, ':')?;
         extra.entry(n).or_default().extend(parse_opts(&kv)?);
     }

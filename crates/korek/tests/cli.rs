@@ -1,5 +1,7 @@
 //! The `korek` binary: `gen`, `--check`, errors and options.
 
+#![allow(clippy::unwrap_used)]
+
 mod common;
 
 use std::path::Path;
@@ -9,10 +11,9 @@ use common::example;
 
 fn korek(args: &[&str]) -> std::process::Output {
     let bin_dir = Path::new(env!("CARGO_BIN_EXE_korek")).parent().unwrap();
-    let path = std::env::join_paths(
-        std::iter::once(bin_dir.to_path_buf())
-            .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())),
-    )
+    let path = std::env::join_paths(core::iter::once(bin_dir.to_path_buf()).chain(
+        std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()),
+    ))
     .unwrap();
     Command::new(env!("CARGO_BIN_EXE_korek"))
         .args(args)
@@ -47,7 +48,11 @@ fn gen_then_check() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("out of date"));
     // Generate, then --check passes.
     let out = korek(&args);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(gen_dir.join("rust/types.rs").is_file());
     assert!(korek(&check).status.success());
     // Edit the schema: stale again.
@@ -90,7 +95,11 @@ fn plugin_options_and_errors() {
         "file=generated.rs",
         schema.to_str().unwrap(),
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(rust.join("generated.rs").is_file());
     // An unknown option is the plugin's error.
     let out = korek(&[

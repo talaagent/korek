@@ -95,7 +95,11 @@ fn resolve_ty(schema: &Schema, ty: &Type, j: &Json) -> Result<Value, String> {
             j.as_array()
                 .ok_or_else(bad)?
                 .iter()
-                .map(|b| b.as_u64().and_then(|b| u8::try_from(b).ok()).ok_or_else(bad))
+                .map(|b| {
+                    b.as_u64()
+                        .and_then(|b| u8::try_from(b).ok())
+                        .ok_or_else(bad)
+                })
                 .collect::<Result<_, _>>()?,
         ),
         Type::List(t) => Value::List(
@@ -121,6 +125,7 @@ fn resolve_ty(schema: &Schema, ty: &Type, j: &Json) -> Result<Value, String> {
     })
 }
 
+#[allow(clippy::many_single_char_names)]
 fn named(schema: &Schema, name: &str, j: &Json) -> Result<Value, String> {
     let def = schema
         .get(name)

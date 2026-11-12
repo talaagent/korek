@@ -157,7 +157,12 @@ impl Loader {
             p.file(f);
         }
         let mut sources = Sources { files };
-        let fail = |diagnostics, sources| Err(Failure { diagnostics, sources });
+        let fail = |diagnostics, sources| {
+            Err(Failure {
+                diagnostics,
+                sources,
+            })
+        };
         if !p.diags.is_empty() {
             return fail(p.diags, sources);
         }

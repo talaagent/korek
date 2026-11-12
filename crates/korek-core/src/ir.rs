@@ -317,7 +317,10 @@ impl Type {
 
     /// Strings, bytes, lists and maps have a length.
     pub fn has_len(&self) -> bool {
-        matches!(self, Self::String | Self::Bytes | Self::List(_) | Self::Map(_))
+        matches!(
+            self,
+            Self::String | Self::Bytes | Self::List(_) | Self::Map(_)
+        )
     }
 
     pub fn is_collection(&self) -> bool {

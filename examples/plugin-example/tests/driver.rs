@@ -29,6 +29,12 @@ fn driver_runs_the_example_plugin() {
         .unwrap();
     assert_eq!(report.files.len(), 2, "keys.md and the lockfile");
     let md = std::fs::read_to_string(out.join("keys.md")).unwrap();
-    assert!(md.contains("| `session.timeout_s` | `u64` | `600` | Turn timeout. |"), "{md}");
-    assert!(md.contains(r#""setting":[{"name":"setting","props":{"layers":"user"}}]"#), "{md}");
+    assert!(
+        md.contains("| `session.timeout_s` | `u64` | `600` | Turn timeout. |"),
+        "{md}"
+    );
+    assert!(
+        md.contains(r#""setting":[{"name":"setting","props":{"layers":"user"}}]"#),
+        "{md}"
+    );
 }

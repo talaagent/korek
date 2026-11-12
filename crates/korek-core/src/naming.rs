@@ -36,10 +36,7 @@ fn proto_base(ty: &Type) -> String {
 
 /// Every list/map type that needs a Protobuf wrapper message, innermost
 /// first, deduplicated, given the types used by fields, variants and keys.
-pub fn proto_wrappers<'a>(
-    fields: impl IntoIterator<Item = (&'a Type, bool)>,
-) -> Vec<Type> {
-    let mut out: Vec<Type> = Vec::new();
+pub fn proto_wrappers<'a>(fields: impl IntoIterator<Item = (&'a Type, bool)>) -> Vec<Type> {
     fn need(t: &Type, out: &mut Vec<Type>) {
         let (Type::List(inner) | Type::Map(inner)) = t else {
             return;
@@ -57,6 +54,7 @@ pub fn proto_wrappers<'a>(
             walk(inner, out);
         }
     }
+    let mut out: Vec<Type> = Vec::new();
     // `in_oneof`: a union variant, where collections must be wrapped.
     for (t, in_oneof) in fields {
         if in_oneof && t.is_collection() {

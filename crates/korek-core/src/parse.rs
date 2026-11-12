@@ -25,6 +25,14 @@ pub(crate) struct Aux {
     pub package_span: Option<Span>,
 }
 
+const FIELD_PROPS: &[&str] = &[
+    "doc", "id", "optional", "min", "max", "min_len", "max_len", "pattern",
+];
+const KEY_PROPS: &[&str] = &[
+    "doc", "id", "default", "min", "max", "min_len", "max_len", "pattern",
+];
+const RPC_PROPS: &[&str] = &["doc", "input", "output", "idempotency"];
+
 pub(crate) struct Parser<'e> {
     pub exts: &'e [Box<dyn Extension>],
     pub diags: Vec<Diagnostic>,
@@ -83,9 +91,18 @@ impl<'e> Parser<'e> {
     fn top(&mut self, node: Node<'_>) {
         let r = match node.name() {
             "package" => self.package(node),
-            "enum" => self.enum_def(node),
-            "struct" => self.struct_def(node),
-            "union" => self.union_def(node),
+            "enum" => {
+                self.enum_def(node);
+                Ok(())
+            }
+            "struct" => {
+                self.struct_def(node);
+                Ok(())
+            }
+            "union" => {
+                self.union_def(node);
+                Ok(())
+            }
             "keys" => self.keys(node),
             "service" => self.service(node),
             other => {
@@ -348,14 +365,26 @@ impl<'e> Parser<'e> {
             #[allow(clippy::cast_precision_loss)]
             ("min" | "max", Literal::Int(i)) => {
                 let v = Some(*i as f64);
-                if name == "min" { c.min = v } else { c.max = v }
+                if name == "min" {
+                    c.min = v;
+                } else {
+                    c.max = v;
+                }
             }
             ("min" | "max", Literal::Float(f)) => {
-                if name == "min" { c.min = Some(*f) } else { c.max = Some(*f) }
+                if name == "min" {
+                    c.min = Some(*f);
+                } else {
+                    c.max = Some(*f);
+                }
             }
             ("min_len" | "max_len", Literal::Int(i)) if *i >= 0 => {
                 let v = u64::try_from(*i).ok();
-                if name == "min_len" { c.min_len = v } else { c.max_len = v }
+                if name == "min_len" {
+                    c.min_len = v;
+                } else {
+                    c.max_len = v;
+                }
             }
             ("pattern", Literal::String(s)) => c.pattern = Some(s.clone()),
             ("min" | "max", _) => self.diags.push(bad("a number")),
@@ -416,13 +445,13 @@ impl<'e> Parser<'e> {
         })
     }
 
-    fn enum_def(&mut self, node: Node<'_>) -> Result<(), Diagnostic> {
+    fn enum_def(&mut self, node: Node<'_>) {
         let kind = TypeKind::Enum(EnumDef {
             variants: Vec::new(),
             retired: Vec::new(),
         });
         let Some(mut t) = self.type_def(node, kind) else {
-            return Ok(());
+            return;
         };
         let mut variants = Vec::new();
         self.no_extras(node, ItemKind::Enum, &["doc"], &mut t.ext);
@@ -443,7 +472,6 @@ impl<'e> Parser<'e> {
             retired: Vec::new(),
         });
         self.schema.types.push(t);
-        Ok(())
     }
 
     fn enum_variant(&mut self, node: Node<'_>) -> Option<EnumVariant> {
@@ -467,13 +495,13 @@ impl<'e> Parser<'e> {
         Some(v)
     }
 
-    fn struct_def(&mut self, node: Node<'_>) -> Result<(), Diagnostic> {
+    fn struct_def(&mut self, node: Node<'_>) {
         let kind = TypeKind::Struct(StructDef {
             fields: Vec::new(),
             retired: Vec::new(),
         });
         let Some(mut t) = self.type_def(node, kind) else {
-            return Ok(());
+            return;
         };
         let mut fields = Vec::new();
         self.no_extras(node, ItemKind::Struct, &["doc"], &mut t.ext);
@@ -494,7 +522,6 @@ impl<'e> Parser<'e> {
             retired: Vec::new(),
         });
         self.schema.types.push(t);
-        Ok(())
     }
 
     /// Constraints given as properties (`min=1`).
@@ -525,10 +552,7 @@ impl<'e> Parser<'e> {
             span,
             ext: Ext::new(),
         };
-        const KNOWN: &[&str] = &[
-            "doc", "id", "optional", "min", "max", "min_len", "max_len", "pattern",
-        ];
-        self.no_extras(node, ItemKind::Field, KNOWN, &mut f.ext);
+        self.no_extras(node, ItemKind::Field, FIELD_PROPS, &mut f.ext);
         self.doc_prop(node, &mut f.doc);
         self.id_prop(node, span);
         self.constraint_props(node, &mut f.constraints);
@@ -542,14 +566,14 @@ impl<'e> Parser<'e> {
         Some(f)
     }
 
-    fn union_def(&mut self, node: Node<'_>) -> Result<(), Diagnostic> {
+    fn union_def(&mut self, node: Node<'_>) {
         let kind = TypeKind::Union(UnionDef {
             tag: None,
             variants: Vec::new(),
             retired: Vec::new(),
         });
         let Some(mut t) = self.type_def(node, kind) else {
-            return Ok(());
+            return;
         };
         let tag = self.str_prop(node, "tag");
         if let Some((tag, span)) = &tag {
@@ -583,7 +607,6 @@ impl<'e> Parser<'e> {
             retired: Vec::new(),
         });
         self.schema.types.push(t);
-        Ok(())
     }
 
     fn union_variant(&mut self, node: Node<'_>) -> Option<UnionVariant> {
@@ -656,10 +679,7 @@ impl<'e> Parser<'e> {
             span,
             ext: Ext::new(),
         };
-        const KNOWN: &[&str] = &[
-            "doc", "id", "default", "min", "max", "min_len", "max_len", "pattern",
-        ];
-        self.no_extras(node, ItemKind::Key, KNOWN, &mut k.ext);
+        self.no_extras(node, ItemKind::Key, KEY_PROPS, &mut k.ext);
         if let Some(d) = node.prop("default") {
             self.aux.default.insert(span, d);
         }
@@ -753,8 +773,7 @@ impl<'e> Parser<'e> {
             span,
             ext: Ext::new(),
         };
-        const KNOWN: &[&str] = &["doc", "input", "output", "idempotency"];
-        self.no_extras(node, ItemKind::Rpc, KNOWN, &mut r.ext);
+        self.no_extras(node, ItemKind::Rpc, RPC_PROPS, &mut r.ext);
         self.doc_prop(node, &mut r.doc);
         self.body(node, ItemKind::Rpc, &mut r.doc, None, &mut r.ext);
         Some(r)
@@ -771,6 +790,5 @@ pub(crate) fn is_snake(s: &str) -> bool {
 
 pub(crate) fn is_pascal(s: &str) -> bool {
     let mut chars = s.chars();
-    chars.next().is_some_and(|c| c.is_ascii_uppercase())
-        && chars.all(|c| c.is_ascii_alphanumeric())
+    chars.next().is_some_and(|c| c.is_ascii_uppercase()) && chars.all(|c| c.is_ascii_alphanumeric())
 }

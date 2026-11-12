@@ -219,15 +219,10 @@ pub trait Hook {
 /// Runs a plugin: reads the request from stdin, calls `f`, writes the
 /// response to stdout. An `Err` becomes a response with that error.
 pub fn run(f: impl FnOnce(&GenerateRequest) -> Result<GenerateResponse, Diagnostic>) -> ExitCode {
-    let enc = match std::env::var(ENCODING_ENV) {
-        Ok(name) => match Encoding::from_name(&name) {
-            Some(e) => e,
-            None => {
-                eprintln!("unsupported encoding {name:?}");
-                return ExitCode::FAILURE;
-            }
-        },
-        Err(_) => Encoding::Json,
+    let name = std::env::var(ENCODING_ENV).unwrap_or_else(|_| "json".into());
+    let Some(enc) = Encoding::from_name(&name) else {
+        eprintln!("unsupported encoding {name:?}");
+        return ExitCode::FAILURE;
     };
     let mut input = Vec::new();
     if let Err(e) = std::io::stdin().read_to_end(&mut input) {
@@ -260,7 +255,11 @@ pub fn run(f: impl FnOnce(&GenerateRequest) -> Result<GenerateResponse, Diagnost
         }
     };
     let mut stdout = std::io::stdout().lock();
-    if stdout.write_all(&out).and_then(|()| stdout.flush()).is_err() {
+    if stdout
+        .write_all(&out)
+        .and_then(|()| stdout.flush())
+        .is_err()
+    {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
