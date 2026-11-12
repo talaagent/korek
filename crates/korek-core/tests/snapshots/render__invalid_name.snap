@@ -1,0 +1,12 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct lower_case {}"
+---
+korek::invalid_name (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_name)
+
+  × type `lower_case` must be PascalCase
+   ╭─[test.kdl:1:8]
+ 1 │ struct lower_case {}
+   ·        ─────┬────
+   ·             ╰── here
+   ╰────

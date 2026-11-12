@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\" opt=#true\n}"
+---
+korek::unknown_property (https://github.com/talaagent/korek/blob/main/docs/errors.md#unknown_property)
+
+  × unknown property `opt`
+   ╭─[test.kdl:2:20]
+ 1 │ struct A {
+ 2 │   field x "string" opt=#true
+   ·                    ────┬────
+   ·                        ╰── not recognized here
+ 3 │ }
+   ╰────

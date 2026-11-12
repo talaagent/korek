@@ -1,0 +1,7 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: render(&f)
+---
+korek::io (https://github.com/talaagent/korek/blob/main/docs/errors.md#io)
+
+  × does/not/exist: No such file or directory (os error 2)

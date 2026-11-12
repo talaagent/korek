@@ -1,0 +1,12 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "enum E {}"
+---
+korek::empty (https://github.com/talaagent/korek/blob/main/docs/errors.md#empty)
+
+  × enum `E` has no variants
+   ╭─[test.kdl:1:6]
+ 1 │ enum E {}
+   ·      ┬
+   ·      ╰── add a variant
+   ╰────

@@ -1,0 +1,7 @@
+---
+source: crates/korek-cli/tests/render.rs
+expression: "korek(tmp.path(), &[\"gen\", \"--rust\", \"out\", \"--rust_opt\", \"nope=1\", \"schema\"])"
+---
+korek::invalid_option (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_option)
+
+  × unknown option `nope` for korek-gen-rust (known: file)

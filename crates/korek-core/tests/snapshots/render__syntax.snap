@@ -1,0 +1,21 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\"\n"
+---
+korek::syntax (https://github.com/talaagent/korek/blob/main/docs/errors.md#syntax)
+
+  × No closing '}' for child block
+   ╭─[test.kdl:1:10]
+ 1 │ struct A {
+   ·          ┬
+   ·          ╰── not closed
+ 2 │   field x "string"
+   ╰────
+korek::syntax (https://github.com/talaagent/korek/blob/main/docs/errors.md#syntax)
+
+  × Closing '}' was not found after nodes
+   ╭─[test.kdl:1:11]
+ 1 │ ╭─▶ struct A {
+ 2 │ ├─▶   field x "string"
+   · ╰──── not closed
+   ╰────

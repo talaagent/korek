@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\"\n  field y \"string\" id=1\n}"
+---
+korek::id_taken (https://github.com/talaagent/korek/blob/main/docs/errors.md#id_taken)
+
+  × id=1 already belongs to `x` in korek.lock
+   ╭─[test.kdl:3:20]
+ 2 │   field x "string"
+ 3 │   field y "string" id=1
+   ·                    ──┬─
+   ·                      ╰── taken
+ 4 │ }
+   ╰────

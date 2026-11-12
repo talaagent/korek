@@ -1,0 +1,15 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "union U tag=\"t\" {\n  variant a \"string\"\n}"
+---
+korek::invalid_union (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_union)
+
+  × variant `a` of tagged union `U` must be a struct, found `string`
+   ╭─[test.kdl:2:13]
+ 1 │ union U tag="t" {
+ 2 │   variant a "string"
+   ·             ────┬───
+   ·                 ╰── not a struct
+ 3 │ }
+   ╰────
+  help: remove `tag=` for an untagged union of any types

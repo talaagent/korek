@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"map<i64,string>\"\n}"
+---
+korek::invalid_type (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_type)
+
+  × map keys must be `string`, found `i64` in `map<i64,string>`
+   ╭─[test.kdl:2:11]
+ 1 │ struct A {
+ 2 │   field x "map<i64,string>"
+   ·           ────────┬────────
+   ·                   ╰── in this type
+ 3 │ }
+   ╰────

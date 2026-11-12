@@ -16,7 +16,8 @@ Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zo
 - `crates/korek`: the facade and `Driver`. `crates/korek-cli`: the `korek` binary (`builtin` feature links
   the generators) and the `korek-gen-*` binaries (`src/bin/`, so tests get `CARGO_BIN_EXE_*`).
 - `crates/korek-testkit`: shared rule vectors (`vectors/rules.json`) run against the loader, generated Rust
-  (build script) and generated Zod (`ts/vectors.test.ts`).
+  (build script), generated Zod (`ts/vectors.test.ts`) and generated Protobuf under protovalidate-es
+  (`ts/protovalidate.test.ts`, descriptors from `buf build` of `gen/proto`).
 - `crates/korek-fixture`: `include!`s the generated Rust for `examples/basic` so it is compiled and tested.
 - `examples/basic`: the example schema; `gen/` holds the golden outputs (`crates/korek/tests/golden.rs`).
 - `examples/plugin-example`: a third-party plugin and a driver test for it.
@@ -46,7 +47,9 @@ nix develop -c sh -c 'bun install && bun test && bun run typecheck'
 - IR changes are protocol changes: keep structs `#[non_exhaustive]`, add fields with serde defaults,
   bump `korek_plugin::PROTOCOL_VERSION` on breaking ones.
 - Every diagnostic has a stable `korek::<code>` and a span when there is a source location; add a test
-  in `crates/korek-core/tests/load.rs` for new errors.
+  in `crates/korek-core/tests/load.rs` for new errors. New codes also get an insta snapshot of their
+  rendering: `crates/korek-core/tests/render.rs` (loader codes) or `crates/korek-cli/tests/render.rs`
+  (generator/CLI codes); accept with `INSTA_UPDATE=always` (or `cargo insta review`) and read the `.snap`.
 - Generated code must pass the downstream tools: Rust compiles (fixture), proto passes `buf lint` and
   `buf build`, Zod passes `bun test` and `tsc`.
 - No "kdl" in crate, binary or module names; KDL is only the input format.

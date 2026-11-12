@@ -1,0 +1,24 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "enum E { variant x }\nservice S {\n  rpc Do input=\"E\" output=\"E\"\n}"
+---
+korek::invalid_rpc (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_rpc)
+
+  × `E` is an enum; rpc input and output must be a struct or union
+   ╭─[test.kdl:3:10]
+ 2 │ service S {
+ 3 │   rpc Do input="E" output="E"
+   ·          ────┬────
+   ·              ╰── not a message
+ 4 │ }
+   ╰────
+korek::invalid_rpc (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_rpc)
+
+  × `E` is an enum; rpc input and output must be a struct or union
+   ╭─[test.kdl:3:20]
+ 2 │ service S {
+ 3 │   rpc Do input="E" output="E"
+   ·                    ─────┬────
+   ·                         ╰── not a message
+ 4 │ }
+   ╰────

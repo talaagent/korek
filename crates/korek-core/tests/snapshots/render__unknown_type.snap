@@ -1,0 +1,15 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field b \"Strng\"\n}\nstruct String2 {}"
+---
+korek::unknown_type (https://github.com/talaagent/korek/blob/main/docs/errors.md#unknown_type)
+
+  × unknown type `Strng`
+   ╭─[test.kdl:2:11]
+ 1 │ struct A {
+ 2 │   field b "Strng"
+   ·           ───┬───
+   ·              ╰── not declared
+ 3 │ }
+   ╰────
+  help: did you mean `String2`?

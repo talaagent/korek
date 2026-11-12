@@ -1,0 +1,7 @@
+---
+source: crates/korek-cli/tests/render.rs
+expression: "korek(tmp.path(),\n&[\"gen\", \"--out\", \"foo=out\", \"--plugin\", \"foo=./fail.sh\", \"schema\"])"
+---
+korek::plugin_failed (https://github.com/talaagent/korek/blob/main/docs/errors.md#plugin_failed)
+
+  × plugin `foo`: ./fail.sh exited with exit status: 3: it broke
