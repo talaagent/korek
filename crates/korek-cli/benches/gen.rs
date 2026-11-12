@@ -12,27 +12,23 @@ use divan::Bencher;
 use korek::{Driver, Output};
 use korek_core::{Loader, SourceFile};
 use korek_ir::{GenerateRequest, Schema};
-use korek_testkit::synthetic::{Size, schema};
+use korek_testkit::synthetic::{Size, files, schema};
 
 fn main() {
     divan::main();
 }
 
-static SOURCE: LazyLock<String> = LazyLock::new(|| schema(Size::LARGE));
+static FILES: LazyLock<Vec<SourceFile>> = LazyLock::new(|| {
+    files(Size::LARGE)
+        .into_iter()
+        .map(|(path, contents)| SourceFile { path, contents })
+        .collect()
+});
 
-static SCHEMA: LazyLock<Schema> = LazyLock::new(|| load(&SOURCE));
+static SCHEMA: LazyLock<Schema> = LazyLock::new(|| load(FILES.clone()));
 
-fn load(src: &str) -> Schema {
-    Loader::new()
-        .load_sources(
-            vec![SourceFile {
-                path: "bench.kdl".into(),
-                contents: src.to_owned(),
-            }],
-            None,
-        )
-        .unwrap()
-        .schema
+fn load(files: Vec<SourceFile>) -> Schema {
+    Loader::new().load_sources(files, None).unwrap().schema
 }
 
 const GENERATORS: &[&str] = &["rust", "proto", "zod", "ts", "jsonschema"];
@@ -49,10 +45,19 @@ fn plugin(name: &str) -> Plugin {
     }
 }
 
-/// Parse, lower, validate, check defaults and examples, number.
-#[divan::bench(sample_count = 30)]
-fn load_and_validate(b: Bencher) {
-    b.bench(|| load(&SOURCE));
+/// Parse, lower, validate, check defaults and examples, number: the
+/// schema in 18 files, and in one.
+#[divan::bench(args = [false, true], sample_count = 30)]
+fn load_and_validate(b: Bencher, one_file: bool) {
+    let files = if one_file {
+        vec![SourceFile {
+            path: "bench.kdl".into(),
+            contents: schema(Size::LARGE),
+        }]
+    } else {
+        FILES.clone()
+    };
+    b.with_inputs(|| files.clone()).bench_values(load);
 }
 
 /// The `GenerateRequest` a subprocess plugin receives, as JSON.
@@ -92,7 +97,9 @@ fn driver(dir: &Path, subprocess: bool) -> Driver {
 fn full_gen(b: Bencher, subprocess: bool) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("schema")).unwrap();
-    std::fs::write(dir.path().join("schema/bench.kdl"), &*SOURCE).unwrap();
+    for f in &*FILES {
+        std::fs::write(dir.path().join("schema").join(&f.path), &f.contents).unwrap();
+    }
     let d = driver(dir.path(), subprocess);
     d.run(&dir.path().join("schema")).unwrap();
     b.bench(|| d.run(&dir.path().join("schema")).unwrap());

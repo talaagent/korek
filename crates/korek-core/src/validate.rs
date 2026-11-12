@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 
 use korek_ir::codes;
 use korek_ir::naming;
-use korek_ir::{Diagnostic, Format, Json, RuleKind, Schema, Span, Type, TypeKind, Validate};
+use korek_ir::{
+    Diagnostic, Format, Json, RuleKind, Schema, Span, Type, TypeIndex, TypeKind, Types, Validate,
+};
 
 use crate::ext::{Arg, Literal};
 use crate::parse::Aux;
@@ -16,6 +18,8 @@ fn err(code: &str, msg: impl Into<String>, span: Span, label: &str) -> Diagnosti
 
 pub(crate) struct Validator<'a> {
     pub schema: &'a Schema,
+    /// Type lookup by name.
+    pub index: TypeIndex<'a>,
     pub aux: &'a Aux,
     pub diags: Vec<Diagnostic>,
     /// Defaults in canonical JSON, by field or key span.
@@ -239,7 +243,7 @@ impl Validator<'_> {
                     (&r.output, self.aux.out_span.get(&r.span)),
                 ] {
                     let at = at.copied().unwrap_or(r.span);
-                    match self.schema.get(name).map(|t| &t.kind) {
+                    match self.index.get(name).map(|t| &t.kind) {
                         None => self.unknown(name, at),
                         Some(TypeKind::Enum(_)) => self.diags.push(err(codes::INVALID_RPC, format!("`{name}` is an enum; rpc input and output must be a struct or union"), at, "not a message")),
                         Some(_) => {}
@@ -258,7 +262,7 @@ impl Validator<'_> {
             for v in &u.variants {
                 let at = self.aux.ty_span.get(&v.span).copied().unwrap_or(v.span);
                 let target = match &v.ty {
-                    Type::Named(n) => self.schema.get(n),
+                    Type::Named(n) => self.index.get(n),
                     _ => None,
                 };
                 match target.map(|t| &t.kind) {
@@ -322,9 +326,12 @@ impl Validator<'_> {
             if reported {
                 break;
             }
-            if let Some(cycle) = visit(s, &t.name, &mut state, &edges, &mut Vec::new()) {
+            if let Some(cycle) = visit(&self.index, &t.name, &mut state, &edges, &mut Vec::new()) {
                 reported = true;
-                let at = s.get(&cycle[0]).map_or(t.span, |d| self.name_span(d.span));
+                let at = self
+                    .index
+                    .get(&cycle[0])
+                    .map_or(t.span, |d| self.name_span(d.span));
                 self.diags.push(err(
                     codes::CYCLE,
                     format!(
@@ -340,7 +347,7 @@ impl Validator<'_> {
 
     fn kind_of(&self, ty: &Type) -> Option<&TypeKind> {
         match ty {
-            Type::Named(n) => self.schema.get(n).map(|t| &t.kind),
+            Type::Named(n) => self.index.get(n).map(|t| &t.kind),
             _ => None,
         }
     }
@@ -405,8 +412,8 @@ impl Validator<'_> {
                 .map(|_| ())
                 .ok_or_else(|| "expected a number".into());
         }
-        korek_ir::value::resolve(self.schema, ty, v).map(|_| ())?;
-        crate::check::check(self.schema, ty, v, &Validate::default())
+        korek_ir::value::resolve(&self.index, ty, v).map(|_| ())?;
+        crate::check::check(&self.index, ty, v, &Validate::default())
     }
 
     #[allow(clippy::too_many_lines)]
@@ -438,7 +445,7 @@ impl Validator<'_> {
                 }
             }
             let problem = match &r.kind {
-                RuleKind::Pattern { regex } => regex::Regex::new(regex)
+                RuleKind::Pattern { regex } => crate::check::compile(regex)
                     .err()
                     .map(|e| format!("invalid pattern: {e}")),
                 RuleKind::Within { duration } => korek_runtime::time::parse_duration(duration)
@@ -600,9 +607,9 @@ impl Validator<'_> {
 
     /// Resolves one default or example against its type and rules.
     fn value(&self, ty: &Type, v: &Validate, arg: &Arg) -> Result<Json, String> {
-        let j = literal_json(ty, self.schema, &arg.value)?;
-        korek_ir::value::resolve(self.schema, ty, &j)?;
-        crate::check::check(self.schema, ty, &j, v)?;
+        let j = literal_json(ty, &self.index, &arg.value)?;
+        korek_ir::value::resolve(&self.index, ty, &j)?;
+        crate::check::check(&self.index, ty, &j, v)?;
         Ok(j)
     }
 
@@ -673,7 +680,7 @@ impl Validator<'_> {
 /// A default or example as JSON: native values for scalars and enums, a
 /// JSON string for lists, maps, structs and tagged unions (an untagged
 /// union also takes a native value, or a string that is not JSON as itself).
-fn literal_json(ty: &Type, schema: &Schema, lit: &Literal) -> Result<Json, String> {
+fn literal_json(ty: &Type, schema: &TypeIndex<'_>, lit: &Literal) -> Result<Json, String> {
     let compound = match ty {
         Type::List(_) | Type::Map(_) => Some(false),
         Type::Named(n) => match schema.get(n).map(|t| &t.kind) {
@@ -716,7 +723,7 @@ fn used_types(schema: &Schema) -> Vec<(&Type, bool, Span)> {
 
 #[allow(clippy::type_complexity)]
 fn visit<'s>(
-    s: &'s Schema,
+    s: &'s TypeIndex<'s>,
     name: &'s str,
     state: &mut HashMap<&'s str, u8>,
     edges: &dyn Fn(&crate::ir::TypeDef) -> Vec<String>,

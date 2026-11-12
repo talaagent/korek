@@ -24,6 +24,7 @@ pub mod source;
 pub mod types;
 mod validate;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub use diag::Failure;
@@ -134,9 +135,7 @@ impl Loader {
     ) -> Result<Loaded, Failure> {
         let exts: Vec<&dyn Extension> = self.exts.iter().map(|e| &**e as &dyn Extension).collect();
         let mut p = parse::Parser::new(&exts);
-        for f in &files {
-            p.file(f);
-        }
+        p.files(&files);
         let mut sources = Sources { files };
         if !p.diags.is_empty() {
             return Err(Failure::new(p.diags, sources));
@@ -156,6 +155,7 @@ impl Loader {
         };
         let mut v = validate::Validator {
             schema: &p.schema,
+            index: p.schema.index(),
             aux: &p.aux,
             diags: Vec::new(),
             resolved: Vec::new(),
@@ -165,7 +165,7 @@ impl Loader {
         let (resolved, examples, mut diags) = (v.resolved, v.examples, v.diags);
         let mut schema = p.schema;
         let new_lock = lock::assign(&mut schema, &p.aux.id, &old, &mut diags);
-        finish(&mut schema, &resolved, &examples);
+        finish(&mut schema, resolved, examples);
         if diags.is_empty() {
             for x in &self.exts {
                 diags.extend(x.check(&schema));
@@ -188,29 +188,24 @@ impl Loader {
 /// Moves resolved defaults and examples into the IR.
 fn finish(
     schema: &mut Schema,
-    resolved: &[(ir::Span, ir::Json)],
-    examples: &[(ir::Span, Vec<ir::Json>)],
+    resolved: Vec<(ir::Span, ir::Json)>,
+    examples: Vec<(ir::Span, Vec<ir::Json>)>,
 ) {
-    let default = |s: ir::Span| resolved.iter().find(|r| r.0 == s).map(|r| r.1.clone());
-    let examples_of = |s: ir::Span| {
-        examples
-            .iter()
-            .find(|e| e.0 == s)
-            .map(|e| e.1.clone())
-            .unwrap_or_default()
-    };
+    let mut resolved: HashMap<ir::Span, ir::Json> = resolved.into_iter().collect();
+    let mut examples: HashMap<ir::Span, Vec<ir::Json>> = examples.into_iter().collect();
+    let mut examples_of = |s: ir::Span| examples.remove(&s).unwrap_or_default();
     for t in &mut schema.types {
         t.attrs.examples = examples_of(t.span);
         if let ir::TypeKind::Struct(s) = &mut t.kind {
             for f in &mut s.fields {
-                f.default = default(f.span);
+                f.default = resolved.remove(&f.span);
                 f.attrs.examples = examples_of(f.span);
             }
         }
     }
     for g in &mut schema.keys {
         for k in &mut g.keys {
-            k.default = default(k.span);
+            k.default = resolved.remove(&k.span);
             k.attrs.examples = examples_of(k.span);
         }
     }

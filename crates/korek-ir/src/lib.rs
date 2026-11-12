@@ -11,7 +11,7 @@ pub mod naming;
 pub mod protocol;
 pub mod value;
 
-pub use impls::{ext_as, format_number};
+pub use impls::{TypeIndex, Types, ext_as, format_number};
 pub use ir::*;
 pub use protocol::{Diagnostic, File, GenerateRequest, GenerateResponse, Label, Severity};
 

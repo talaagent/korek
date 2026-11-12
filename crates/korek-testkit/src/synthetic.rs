@@ -28,20 +28,39 @@ impl Size {
 /// Union chains restart every `DEPTH` groups.
 const DEPTH: usize = 20;
 
+/// Groups per types file in [`files`].
+const PER_FILE: usize = 25;
+
 /// The schema as one file's text.
 pub fn schema(size: Size) -> String {
-    let mut s = String::with_capacity(size.modules * 2400 + size.key_groups * 1400);
-    s.push_str("package \"bench.v1\"\n");
-    for i in 0..size.modules {
-        module(&mut s, i);
+    files(size).into_iter().map(|(_, text)| text).collect()
+}
+
+/// The schema as files (`types_00.kdl` with 25 groups each, `keys.kdl`,
+/// `services.kdl`), as a real schema directory would split it.
+pub fn files(size: Size) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (n, start) in (0..size.modules).step_by(PER_FILE).enumerate() {
+        let mut s = String::with_capacity(PER_FILE * 2400);
+        if n == 0 {
+            s.push_str("package \"bench.v1\"\n");
+        }
+        for i in start..(start + PER_FILE).min(size.modules) {
+            module(&mut s, i);
+        }
+        out.push((format!("types_{n:02}.kdl"), s));
     }
+    let mut s = String::with_capacity(size.key_groups * 1400);
     for g in 0..size.key_groups {
         keys(&mut s, g, size.modules);
     }
+    out.push(("keys.kdl".into(), s));
+    let mut s = String::new();
     for v in 0..size.services {
         service(&mut s, v, size.modules);
     }
-    s
+    out.push(("services.kdl".into(), s));
+    out
 }
 
 fn module(s: &mut String, i: usize) {
