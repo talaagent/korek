@@ -16,7 +16,8 @@ Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zo
 - `crates/korek`: the facade and `Driver`. `crates/korek-cli`: the `korek` binary (`builtin` feature links
   the generators) and the `korek-gen-*` binaries (`src/bin/`, so tests get `CARGO_BIN_EXE_*`).
 - `crates/korek-testkit`: shared rule vectors (`vectors/rules.json`) run against the loader, generated Rust
-  (build script) and generated Zod (`ts/vectors.test.ts`).
+  (build script), generated Zod (`ts/vectors.test.ts`) and generated Protobuf under protovalidate-es
+  (`ts/protovalidate.test.ts`, descriptors from `buf build` of `gen/proto`).
 - `crates/korek-fixture`: `include!`s the generated Rust for `examples/basic` so it is compiled and tested.
 - `examples/basic`: the example schema; `gen/` holds the golden outputs (`crates/korek/tests/golden.rs`).
 - `examples/plugin-example`: a third-party plugin and a driver test for it.

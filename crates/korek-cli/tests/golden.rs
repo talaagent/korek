@@ -21,7 +21,8 @@ fn example_outputs_match_the_golden_files() {
     }
 }
 
-/// The Zod and TS outputs for the shared vectors (`ts/vectors.test.ts`).
+/// The Zod, TS and Protobuf outputs for the shared vectors
+/// (`ts/vectors.test.ts`, `ts/protovalidate.test.ts`).
 #[test]
 fn vector_outputs_match_the_golden_files() {
     let kit = common::root().join("crates/korek-testkit");
@@ -29,6 +30,7 @@ fn vector_outputs_match_the_golden_files() {
     let d = builtin_driver()
         .output(korek::Output::new("zod", kit.join("gen/zod")))
         .output(korek::Output::new("ts", kit.join("gen/ts")))
+        .output(korek::Output::new("proto", kit.join("gen/proto")))
         .lock_path(kit.join("schema/korek.lock"))
         .check(!bless);
     if let Err(e) = d.run(&kit.join("schema")) {
