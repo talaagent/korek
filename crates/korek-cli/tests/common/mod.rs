@@ -21,6 +21,7 @@ pub fn driver() -> Driver {
         .plugin("zod", env!("CARGO_BIN_EXE_korek-gen-zod"))
         .plugin("ts", env!("CARGO_BIN_EXE_korek-gen-ts"))
         .plugin("jsonschema", env!("CARGO_BIN_EXE_korek-gen-jsonschema"))
+        .plugin("docs", env!("CARGO_BIN_EXE_korek-gen-docs"))
 }
 
 /// A driver that runs the generators in-process.
@@ -30,10 +31,11 @@ pub fn builtin_driver() -> Driver {
 
 /// Every first-party output into `gen`, plus Zod with inline types.
 pub fn all_outputs(d: Driver, gen_dir: &Path) -> Driver {
-    ["rust", "proto", "zod", "ts", "jsonschema"]
+    ["rust", "proto", "zod", "ts", "jsonschema", "docs"]
         .into_iter()
         .fold(d, |d, n| d.output(Output::new(n, gen_dir.join(n))))
         .output(Output::new("zod", gen_dir.join("zod-inline")).option("types", "inline"))
+        .output(Output::new("docs", gen_dir.join("docs-split")).option("split", "true"))
 }
 
 /// Whether `prog` runs.

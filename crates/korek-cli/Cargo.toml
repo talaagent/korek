@@ -43,10 +43,15 @@ path = "src/bin/korek-gen-ts.rs"
 name = "korek-gen-jsonschema"
 path = "src/bin/korek-gen-jsonschema.rs"
 
+[[bin]]
+name = "korek-gen-docs"
+path = "src/bin/korek-gen-docs.rs"
+
 [dependencies]
 anyhow.workspace = true
 bpaf.workspace = true
 korek = { workspace = true, default-features = false, features = ["miette"] }
+korek-gen-docs.workspace = true
 korek-gen-jsonschema.workspace = true
 korek-gen-proto.workspace = true
 korek-gen-rust.workspace = true

@@ -16,6 +16,7 @@ korek-core = { path = "crates/korek-core" }
 korek-ir = { path = "crates/korek-ir" }
 korek-runtime = { path = "crates/korek-runtime" }
 korek-gen-common = { path = "crates/korek-gen-common" }
+korek-gen-docs = { path = "crates/korek-gen-docs" }
 korek-gen-jsonschema = { path = "crates/korek-gen-jsonschema" }
 korek-cli = { path = "crates/korek-cli" }
 korek-plugin = { path = "crates/korek-plugin" }

@@ -37,6 +37,7 @@ extern crate alloc;
 /// The first-party generators, callable in-process.
 #[cfg(feature = "generators")]
 pub mod generators {
+    pub use korek_gen_docs as docs;
     pub use korek_gen_jsonschema as jsonschema;
     pub use korek_gen_proto as proto;
     pub use korek_gen_rust as rust;
@@ -179,6 +180,7 @@ impl Driver {
             .builtin("zod", korek_gen_zod::plugin)
             .builtin("ts", korek_gen_ts::plugin)
             .builtin("jsonschema", korek_gen_jsonschema::plugin)
+            .builtin("docs", korek_gen_docs::plugin)
     }
 
     /// Runs `name` in-process unless a binary overrides it.
