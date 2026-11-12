@@ -112,6 +112,31 @@ fn plugin_options_and_errors() {
     ]);
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("unknown option `nope`"));
+    // rust_duration maps integers with a time unit to Duration.
+    let out = korek(&[
+        "gen",
+        "--rust",
+        rust.to_str().unwrap(),
+        "--rust_opt",
+        "rust_duration=true",
+        schema.to_str().unwrap(),
+    ]);
+    assert!(out.status.success());
+    let text = std::fs::read_to_string(rust.join("types.rs")).unwrap();
+    assert!(
+        text.contains("pub timeout_ms: ::core::time::Duration,"),
+        "{text}"
+    );
+    let out = korek(&[
+        "gen",
+        "--rust",
+        rust.to_str().unwrap(),
+        "--rust_opt",
+        "rust_duration=maybe",
+        schema.to_str().unwrap(),
+    ]);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("rust_duration must be true or false"));
     // A missing plugin names the binary.
     let out = korek(&["gen", "--out", "nosuch=x", schema.to_str().unwrap()]);
     assert!(!out.status.success());

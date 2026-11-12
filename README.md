@@ -51,7 +51,10 @@ prints diagnostics as JSON lines (code, severity, message, help, url,
 labels with file/line/col). Every code is documented in
 [docs/errors.md](docs/errors.md).
 
-Options: `--rust_opt file=…`; `--proto_opt protovalidate=false,buf_yaml=false`;
+Options: `--rust_opt file=…` and `rust_duration=true` (integer fields and keys
+with a time `unit`, `nanoseconds` through `hours`, become `std::time::Duration`
+in Rust; the JSON stays the integer and rules apply to the count of the unit;
+off by default); `--proto_opt protovalidate=false,buf_yaml=false`;
 `--zod_opt types=inline` (declare the TS types in the Zod file) or
 `ts_path=../ts/types` (where `types=import`, the default, imports them from);
 `--jsonschema_opt per_type=true`.
@@ -312,6 +315,7 @@ cargo test --workspace
 bun install && bun test && bun run typecheck
 KOREK_BLESS=1 cargo test -p korek-cli --test golden    # regenerate goldens
 KOREK_BLESS=1 cargo test -p korek-testkit               # after editing the vectors
+cargo bench -p korek-cli                                # see BENCHMARKS.md
 ```
 
 Licensed under Apache-2.0.

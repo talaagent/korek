@@ -59,6 +59,7 @@ fn contains_named(ty: &Type) -> bool {
 pub(crate) fn type_body(
     schema: &TypeIndex<'_>,
     t: &TypeDef,
+    duration: bool,
     out: &mut String,
     warnings: &mut Vec<Diagnostic>,
 ) {
@@ -66,8 +67,7 @@ pub(crate) fn type_body(
         TypeKind::Enum(_) => {}
         TypeKind::Struct(s) => {
             for f in &s.fields {
-                let mut checks = String::new();
-                value_checks(schema, &f.ty, &f.validate, "v", &mut checks, 3, warnings);
+                let mut checks = field_checks(schema, f, duration, warnings);
                 if contains_named(&f.ty) {
                     let _ = writeln!(
                         checks,
@@ -160,6 +160,33 @@ pub(crate) fn type_body(
             _ => {}
         }
     }
+}
+
+/// A struct field's rule checks on `v`.
+fn field_checks(
+    schema: &TypeIndex<'_>,
+    f: &korek_ir::Field,
+    duration: bool,
+    warnings: &mut Vec<Diagnostic>,
+) -> String {
+    let mut checks = String::new();
+    value_checks(schema, &f.ty, &f.validate, "v", &mut checks, 3, warnings);
+    if let (Some(u), false) = (
+        crate::duration_unit(duration, &f.ty, &f.attrs),
+        checks.is_empty(),
+    ) {
+        checks.insert_str(0, &duration_as_int(u, 3));
+    }
+    checks
+}
+
+/// Rebinds `v` (a `&Duration`) as its integer count of `unit`, so integer
+/// rules apply to it.
+pub(crate) fn duration_as_int(unit: &str, depth: usize) -> String {
+    format!(
+        "{}let v = &{RT}::time::to_int::<{RT}::time::{unit}>(v);\n",
+        "    ".repeat(depth)
+    )
 }
 
 fn indent(s: &str) -> String {

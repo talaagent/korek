@@ -77,6 +77,22 @@ pub fn deserialize<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<u8>, D:
     decode(&s).ok_or_else(|| serde::de::Error::custom("invalid base64"))
 }
 
+/// `bytes` as a [`Codec`](crate::with::Codec), for `bytes` inside lists and
+/// maps: `with::As::<with::List<Base64>>`.
+pub struct Base64;
+
+impl crate::with::Codec<alloc::vec::Vec<u8>> for Base64 {
+    fn serialize<S: serde::Serializer>(v: &alloc::vec::Vec<u8>, s: S) -> Result<S::Ok, S::Error> {
+        serialize(v, s)
+    }
+
+    fn deserialize<'de, D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> Result<alloc::vec::Vec<u8>, D::Error> {
+        deserialize(d)
+    }
+}
+
 /// The same for `Option<Vec<u8>>`.
 pub mod option {
     /// # Errors

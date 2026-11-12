@@ -1,4 +1,5 @@
-//! `timestamp` (RFC 3339) and `duration` (`"1.5s"`) in their JSON forms.
+//! `timestamp` (RFC 3339) and `duration` (`"1.5s"`) in their JSON forms, and
+//! [`Duration`](core::time::Duration) codecs for integers with a [`Unit`].
 
 /// Seconds since the Unix epoch of an RFC 3339 timestamp
 /// (`2024-01-02T03:04:05.5Z`, `…+02:00`).
@@ -110,6 +111,75 @@ pub fn now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0.0, |d| d.as_secs_f64())
+}
+
+/// A time unit: integer fields and keys with `unit` (`seconds`, …) map to
+/// [`Duration`](core::time::Duration) under the Rust option
+/// `rust_duration`, keeping the integer JSON form.
+pub trait Unit {
+    /// Nanoseconds in one unit.
+    const NANOS: u128;
+}
+
+/// The whole number of `U` in `d`, for rules (saturating).
+pub fn to_int<U: Unit>(d: &core::time::Duration) -> i128 {
+    i128::try_from(d.as_nanos() / U::NANOS).unwrap_or(i128::MAX)
+}
+
+/// `n` units as a `Duration`, if it fits.
+pub fn from_int<U: Unit>(n: u64) -> Option<core::time::Duration> {
+    let nanos = u128::from(n).checked_mul(U::NANOS)?;
+    let secs = u64::try_from(nanos / 1_000_000_000).ok()?;
+    #[allow(clippy::cast_possible_truncation)]
+    Some(core::time::Duration::new(
+        secs,
+        (nanos % 1_000_000_000) as u32,
+    ))
+}
+
+macro_rules! units {
+    ($($(#[$m:meta])* $name:ident = $nanos:expr;)*) => {$(
+        $(#[$m])*
+        pub struct $name;
+
+        impl Unit for $name {
+            const NANOS: u128 = $nanos;
+        }
+
+        impl crate::with::Codec<core::time::Duration> for $name {
+            fn serialize<S: serde::Serializer>(
+                v: &core::time::Duration,
+                s: S,
+            ) -> Result<S::Ok, S::Error> {
+                let n = u64::try_from(to_int::<Self>(v))
+                    .map_err(|_| serde::ser::Error::custom("duration out of range"))?;
+                s.serialize_u64(n)
+            }
+
+            fn deserialize<'de, D: serde::Deserializer<'de>>(
+                d: D,
+            ) -> Result<core::time::Duration, D::Error> {
+                let n = <u64 as serde::Deserialize>::deserialize(d)?;
+                from_int::<Self>(n)
+                    .ok_or_else(|| serde::de::Error::custom("duration out of range"))
+            }
+        }
+    )*};
+}
+
+units! {
+    /// `unit "nanoseconds"`.
+    Nanoseconds = 1;
+    /// `unit "microseconds"`.
+    Microseconds = 1_000;
+    /// `unit "milliseconds"`.
+    Milliseconds = 1_000_000;
+    /// `unit "seconds"`.
+    Seconds = 1_000_000_000;
+    /// `unit "minutes"`.
+    Minutes = 60_000_000_000;
+    /// `unit "hours"`.
+    Hours = 3_600_000_000_000;
 }
 
 #[cfg(test)]

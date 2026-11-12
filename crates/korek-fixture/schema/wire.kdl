@@ -1,0 +1,42 @@
+// Fields whose Rust type differs from serde's default JSON form: `bytes` at
+// any depth, and (generated with `rust_duration=true`) integers with a time
+// unit as `Duration`.
+package "wire.v1"
+
+struct Blobs {
+  field one "bytes"
+  field maybe "bytes" optional=#true
+  field list "list<bytes>" { validate { items { max_len 4 } } }
+  field map "map<string,bytes>"
+  field nested "map<string,list<bytes>>" optional=#true
+  field deep "list<list<bytes>>" default=#"[["AAE="]]"#
+}
+
+union Blob {
+  variant raw "bytes"
+  variant many "list<bytes>"
+}
+
+struct Timing {
+  field timeout_ms "u32" default=30000 {
+    unit "milliseconds"
+    validate { gte 1; lte 600000 }
+  }
+  field ttl "u64" optional=#true { unit "seconds" }
+  field retry "i64" {
+    unit "minutes"
+    validate { lte 10 }
+  }
+  field count "u32" { unit "widgets" }
+}
+
+struct Holder {
+  field timing "Timing" default=#"{"timeout_ms": 1500, "retry": 2, "count": 1}"#
+}
+
+keys "wire" {
+  key "timeout" "u32" default=1500 {
+    unit "milliseconds"
+    validate { gte 1 }
+  }
+}
