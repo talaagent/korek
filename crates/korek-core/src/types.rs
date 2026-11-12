@@ -1,6 +1,6 @@
 //! Type expressions: `string`, `list<T>`, `map<string,T>`, `Name`.
 
-use crate::ir::Type;
+use korek_ir::Type;
 
 /// Parses a type expression. Whitespace around `<`, `,` and `>` is allowed.
 ///
@@ -55,12 +55,6 @@ impl P<'_> {
         let name = self.ident().to_owned();
         Ok(match name.as_str() {
             "" => return Err(format!("expected a type name in `{}`", self.s)),
-            "bool" => Type::Bool,
-            "string" => Type::String,
-            "i64" => Type::I64,
-            "u64" => Type::U64,
-            "f64" => Type::F64,
-            "bytes" => Type::Bytes,
             "list" => {
                 self.eat('<')?;
                 let t = self.ty()?;
@@ -81,7 +75,7 @@ impl P<'_> {
                 self.eat('>')?;
                 Type::Map(Box::new(t))
             }
-            _ => Type::Named(name),
+            other => Type::primitive(other).unwrap_or(Type::Named(name)),
         })
     }
 }

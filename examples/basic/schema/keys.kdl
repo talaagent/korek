@@ -1,14 +1,35 @@
 // The key-value part: named, typed keys with defaults and docs.
 keys "session" {
   doc "Per-session settings."
-  key "steer.enabled" "bool" default=#false { doc "Give a new message to the running turn." }
-  key "backend" "Backend" default="claude"
-  key "timeout_s" "u64" default=600 { doc "Turn timeout in seconds."; min 1; max 86400 }
-  key "temperature" "f64" default=0.7 { min 0.0; max 2.0 }
+  key "steer.enabled" "bool" default=#false {
+    doc "Give a new message to the running turn."
+    label "Steering"
+    widget "toggle"
+  }
+  key "backend" "Backend" default="claude" { level "basic" }
+  key "timeout" "duration" default="600s" {
+    doc "Turn timeout."
+    validate { gte "1s"; lte "86400s" }
+  }
+  key "temperature" "f64" default=0.7 { validate { gte 0.0; lte 2.0 } }
   key "turn_limit" "Limit" default=50
+  key "max_turns" "u32" default=20 {
+    deprecated "use turn_limit"
+    alias "turns.max"
+  }
 }
 
 keys "claude" {
-  key "mcp_servers" "map<string,McpServer>" default="{}"
-  key "model" "string" { doc "Model override; unset means the account default."; pattern "^[a-z0-9.-]+$" }
+  key "mcp_servers" "map<string,McpServer>" default="{}" {
+    example #"{"files": {"type": "stdio", "command": "mcp-files"}}"#
+  }
+  key "model" "string" {
+    doc "Model override; unset means the account default."
+    validate { pattern "^[a-z0-9.-]+$" }
+  }
+  key "api_key" "string" {
+    secret
+    validate { min_len 20 }
+    meta "acme.ui" widget="password" group="auth"
+  }
 }

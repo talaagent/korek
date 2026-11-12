@@ -16,10 +16,10 @@ fn main() -> std::process::ExitCode {
                     .as_ref()
                     .map(ToString::to_string)
                     .unwrap_or_default();
-                let meta = if k.ext.is_empty() {
+                let meta = if k.attrs.ext.is_empty() {
                     String::new()
                 } else {
-                    serde_json::to_string(&k.ext).unwrap_or_default()
+                    serde_json::to_string(&k.attrs.ext).unwrap_or_default()
                 };
                 let _ = writeln!(
                     md,
@@ -27,7 +27,7 @@ fn main() -> std::process::ExitCode {
                     g.name,
                     k.name,
                     k.ty.display(),
-                    k.doc.as_deref().unwrap_or("")
+                    k.attrs.doc.as_deref().unwrap_or("")
                 );
             }
         }

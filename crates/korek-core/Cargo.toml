@@ -1,6 +1,6 @@
 [package]
 name = "korek-core"
-description = "korek's schema parser, IR and validation"
+description = "korek's schema parser, lowering and validation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,13 +12,19 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# miette::Diagnostic rendering of diagnostics.
+miette = ["dep:miette"]
+
 [dependencies]
-heck.workspace = true
 kdl.workspace = true
-miette.workspace = true
+korek-ir.workspace = true
+korek-runtime.workspace = true
+miette = { workspace = true, optional = true }
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 miette = { workspace = true, features = ["fancy"] }

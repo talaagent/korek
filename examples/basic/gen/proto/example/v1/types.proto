@@ -4,13 +4,13 @@ syntax = "proto3";
 package example.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 message SearchRequest {
-  string query = 1 [
-    (buf.validate.field).required = true,
-    (buf.validate.field).string.min_len = 1
-  ];
-  optional uint64 limit = 2 [(buf.validate.field).uint64.lte = 100];
+  string query = 1 [(buf.validate.field) = {string: {min_len: 1}}];
+  // Default: 20
+  uint32 limit = 2 [(buf.validate.field) = {uint32: {gte: 1, lte: 100}}];
 }
 
 message SearchResponse {
@@ -18,11 +18,11 @@ message SearchResponse {
 }
 
 message GetRequest {
-  string id = 1 [(buf.validate.field).required = true];
+  string id = 1 [(buf.validate.field) = {string: {uuid: true}}];
 }
 
 message GetResponse {
-  Contact contact = 1 [(buf.validate.field).required = true];
+  Contact contact = 1 [(buf.validate.field) = {required: true}];
 }
 
 // Which provider runs a turn.
@@ -37,25 +37,18 @@ enum Backend {
 // An MCP server started as a child process.
 message McpStdio {
   // The program to run.
-  string command = 1 [
-    (buf.validate.field).required = true,
-    (buf.validate.field).string.min_len = 1
-  ];
+  string command = 1 [(buf.validate.field) = {string: {min_len: 1}}];
   repeated string args = 2;
   // Extra environment variables.
-  map<string, string> env = 3;
+  map<string, string> env = 3 [(buf.validate.field) = {map: {keys: {string: {pattern: "^[A-Z_][A-Z0-9_]*$"}}}}];
 }
 
 // An MCP server reached over HTTP.
 message McpHttp {
-  string url = 1 [
-    (buf.validate.field).required = true,
-    (buf.validate.field).string.pattern = "^https?://"
-  ];
-  optional uint64 timeout_ms = 2 [
-    (buf.validate.field).uint64.gte = 1,
-    (buf.validate.field).uint64.lte = 600000
-  ];
+  string url = 1 [(buf.validate.field) = {string: {uri: true, prefix: "https://"}}];
+  // Unit: milliseconds.
+  // Default: 30000
+  uint32 timeout_ms = 2 [(buf.validate.field) = {uint32: {gte: 1, lte: 600000}}];
 }
 
 // How to reach an MCP server.
@@ -76,20 +69,20 @@ message Limit {
   }
 }
 
+// A person in the address book.
+//
+// Contacts are matched by `id`; names are free text.
 message Contact {
-  string id = 1 [(buf.validate.field).required = true];
-  string name = 2 [
-    (buf.validate.field).required = true,
-    (buf.validate.field).string.max_len = 200
-  ];
-  repeated string emails = 3 [(buf.validate.field).repeated.max_items = 10];
-  optional double score = 4 [
-    (buf.validate.field).double.gte = 0,
-    (buf.validate.field).double.lte = 1
-  ];
-  optional bytes avatar = 5;
+  string id = 1 [(buf.validate.field) = {string: {uuid: true}}];
+  string name = 2 [(buf.validate.field) = {string: {min_len: 1, max_len: 200}}];
+  repeated string emails = 3 [(buf.validate.field) = {repeated: {max_items: 10, unique: true, items: {string: {email: true, max_len: 254}}}}];
+  optional double score = 4 [(buf.validate.field) = {double: {gte: 0.0, lte: 1.0}}];
+  optional bytes avatar = 5 [(buf.validate.field) = {bytes: {max_len: 65536}}];
   // Tag groups.
-  map<string, StringList> tags = 6;
+  map<string, StringList> tags = 6 [(buf.validate.field) = {map: {max_pairs: 16}}];
+  google.protobuf.Timestamp created = 7 [(buf.validate.field) = {timestamp: {lt_now: true}, required: true}];
+  // Since 1.2.
+  optional string phone = 8 [(buf.validate.field) = {cel: [{id: "format.e164", message: "must be a valid e164", expression: "this.matches('^\\\\+[1-9]\\\\d{6,14}$')"}]}];
 }
 
 // Per-session settings.
@@ -99,28 +92,26 @@ message SessionKeys {
   // Default: false
   optional bool steer_enabled = 1;
   // Default: "claude"
-  optional Backend backend = 2 [(buf.validate.field).enum.defined_only = true];
-  // Turn timeout in seconds.
+  optional Backend backend = 2;
+  // Turn timeout.
   //
-  // Default: 600
-  optional uint64 timeout_s = 3 [
-    (buf.validate.field).uint64.gte = 1,
-    (buf.validate.field).uint64.lte = 86400
-  ];
+  // Default: "600s"
+  google.protobuf.Duration timeout = 3 [(buf.validate.field) = {duration: {gte: {seconds: 1}, lte: {seconds: 86400}}}];
   // Default: 0.7
-  optional double temperature = 4 [
-    (buf.validate.field).double.gte = 0,
-    (buf.validate.field).double.lte = 2
-  ];
+  optional double temperature = 4 [(buf.validate.field) = {double: {gte: 0.0, lte: 2.0}}];
   // Default: 50
   Limit turn_limit = 5;
+  // Also known as: turns.max.
+  // Default: 20
+  optional uint32 max_turns = 6;
 }
 
 message ClaudeKeys {
   // Default: {}
   map<string, McpServer> mcp_servers = 1;
   // Model override; unset means the account default.
-  optional string model = 2 [(buf.validate.field).string.pattern = "^[a-z0-9.-]+$"];
+  optional string model = 2 [(buf.validate.field) = {string: {pattern: "^[a-z0-9.-]+$"}}];
+  optional string api_key = 3 [(buf.validate.field) = {string: {min_len: 20}}];
 }
 
 // A `list<string>` where Protobuf cannot nest one directly.

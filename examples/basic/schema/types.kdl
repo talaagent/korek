@@ -8,19 +8,33 @@ enum Backend {
 
 struct McpStdio {
   doc "An MCP server started as a child process."
-  field command "string" { doc "The program to run."; min_len 1 }
+  example #"{"command": "npx", "args": ["-y", "@acme/mcp"]}"#
+  field command "string" {
+    doc "The program to run."
+    validate { min_len 1 }
+  }
   field args "list<string>" optional=#true
-  field env "map<string,string>" optional=#true { doc "Extra environment variables." }
+  field env "map<string,string>" optional=#true {
+    doc "Extra environment variables."
+    validate { keys { pattern "^[A-Z_][A-Z0-9_]*$" } }
+  }
 }
 
 struct McpHttp {
   doc "An MCP server reached over HTTP."
-  field url "string" { pattern "^https?://" }
-  field timeout_ms "u64" optional=#true { min 1; max 600000 }
+  field url "string" {
+    validate { url; prefix "https://" message="MCP servers must use HTTPS" }
+    example "https://mcp.example.com/sse"
+  }
+  field timeout_ms "u32" default=30000 {
+    unit "milliseconds"
+    validate { gte 1; lte 600000 }
+  }
 }
 
 union McpServer tag="type" {
   doc "How to reach an MCP server."
+  validate { required }
   variant stdio "McpStdio"
   variant http "McpHttp"
 }
@@ -33,10 +47,26 @@ union Limit {
 }
 
 struct Contact {
-  field id "string"
-  field name "string" { max_len 200 }
-  field emails "list<string>" { max_len 10 }
-  field score "f64" optional=#true { min 0.0; max 1.0 }
-  field avatar "bytes" optional=#true
-  field tags "map<string,list<string>>" optional=#true { doc "Tag groups." }
+  description """
+    A person in the address book.
+
+    Contacts are matched by `id`; names are free text.
+    """
+  field id "string" { validate { uuid } }
+  field name "string" { validate { min_len 1; max_len 200 } }
+  field emails "list<string>" {
+    validate {
+      max_items 10
+      unique
+      items { email; max_len 254 }
+    }
+  }
+  field score "f64" optional=#true { validate { gte 0.0; lte 1.0 } }
+  field avatar "bytes" optional=#true { validate { max_len 65536 } }
+  field tags "map<string,list<string>>" optional=#true {
+    doc "Tag groups."
+    validate { max_pairs 16 }
+  }
+  field created "timestamp" { validate { lt_now } }
+  field phone "string" optional=#true { validate { e164 }; since "1.2" }
 }

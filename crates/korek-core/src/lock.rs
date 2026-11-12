@@ -12,9 +12,11 @@ use std::collections::HashMap;
 
 use kdl::KdlDocument;
 
-use crate::diag::{Diagnostic, SourceFile};
+use korek_ir::codes;
+use korek_ir::{Diagnostic, Retired, Schema, Span, TypeKind};
+
 use crate::ext::{Literal, Node, span_of};
-use crate::ir::{Retired, Schema, Span, TypeKind};
+use crate::source::SourceFile;
 
 /// The lockfile's file name in a schema directory.
 pub const LOCK_FILE: &str = "korek.lock";
@@ -42,10 +44,10 @@ impl Lock {
                 .into_iter()
                 .map(|d| {
                     Diagnostic::error(
-                        "korek::lock",
+                        codes::LOCKFILE,
                         d.message.unwrap_or_else(|| "invalid lockfile".into()),
                     )
-                    .at(span_of(file, d.span), "here")
+                    .at(span_of!(file, d.span), "here")
                 })
                 .collect::<Vec<_>>()
         })?;
@@ -57,7 +59,7 @@ impl Lock {
                 continue;
             }
             let bad = |what: &str| {
-                Diagnostic::error("korek::lock", format!("malformed lockfile entry: {what}"))
+                Diagnostic::error(codes::LOCKFILE, format!("malformed lockfile entry: {what}"))
                     .at(node.span(), "here")
             };
             let Some(name) = node
@@ -158,7 +160,7 @@ fn number_scope(
         if let Some(l) = locked.filter(|l| **l != id) {
             diags.push(
                 Diagnostic::error(
-                    "korek::renumbered",
+                    codes::RENUMBERED,
                     format!(
                         "`{}` is pinned to id={id} but korek.lock records {l}",
                         it.name
@@ -170,21 +172,24 @@ fn number_scope(
         } else if let Some(other) = used.get(&id).filter(|o| **o != it.name) {
             diags.push(
                 Diagnostic::error(
-                    "korek::id_taken",
+                    codes::ID_TAKEN,
                     format!("id={id} already belongs to `{other}` in korek.lock"),
                 )
                 .at(id_span, "taken"),
             );
         } else if PROTO_RESERVED.contains(&id) {
             diags.push(
-                Diagnostic::error("korek::bad_id", "ids 19000-19999 are reserved by Protobuf")
-                    .at(id_span, "reserved"),
+                Diagnostic::error(
+                    codes::INVALID_ID,
+                    "ids 19000-19999 are reserved by Protobuf",
+                )
+                .at(id_span, "reserved"),
             );
         }
         if let Some(prev) = taken.insert(id, &it.name) {
             diags.push(
                 Diagnostic::error(
-                    "korek::duplicate_id",
+                    codes::DUPLICATE_ID,
                     format!("id={id} is used by both `{prev}` and `{}`", it.name),
                 )
                 .at(id_span, "duplicate"),

@@ -14,6 +14,5 @@ korek-plugin.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
-korek.workspace = true
-korek-core.workspace = true
+korek = { workspace = true, default-features = false }
 tempfile.workspace = true

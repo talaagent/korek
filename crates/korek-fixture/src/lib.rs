@@ -2,6 +2,7 @@
 
 /// `examples/basic/gen/rust/types.rs`.
 #[allow(
+    clippy::all,
     clippy::pedantic,
     clippy::redundant_closure,
     clippy::std_instead_of_alloc,

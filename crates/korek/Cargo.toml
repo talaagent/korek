@@ -1,6 +1,6 @@
 [package]
 name = "korek"
-description = "Define types once in KDL, generate Rust, Protobuf, Zod and TypeScript: the driver and CLI"
+description = "Define types once in KDL, generate Rust, Protobuf, Zod, TypeScript and JSON Schema: the library"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,42 +8,25 @@ repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 publish.workspace = true
-default-run = "korek"
 
 [lints]
 workspace = true
 
-[[bin]]
-name = "korek"
-path = "src/main.rs"
-
-[[bin]]
-name = "korek-gen-rust"
-path = "src/bin/korek-gen-rust.rs"
-
-[[bin]]
-name = "korek-gen-proto"
-path = "src/bin/korek-gen-proto.rs"
-
-[[bin]]
-name = "korek-gen-zod"
-path = "src/bin/korek-gen-zod.rs"
-
-[[bin]]
-name = "korek-gen-ts"
-path = "src/bin/korek-gen-ts.rs"
+[features]
+default = ["generators"]
+# The first-party generator libraries, callable in-process.
+generators = ["dep:korek-gen-rust", "dep:korek-gen-proto", "dep:korek-gen-zod", "dep:korek-gen-ts", "dep:korek-gen-jsonschema"]
+miette = ["korek-core/miette"]
 
 [dependencies]
-bpaf.workspace = true
 korek-core.workspace = true
-korek-gen-proto.workspace = true
-korek-gen-rust.workspace = true
-korek-gen-ts.workspace = true
-korek-gen-zod.workspace = true
+korek-gen-jsonschema = { workspace = true, optional = true }
+korek-gen-proto = { workspace = true, optional = true }
+korek-gen-rust = { workspace = true, optional = true }
+korek-gen-ts = { workspace = true, optional = true }
+korek-gen-zod = { workspace = true, optional = true }
+korek-ir.workspace = true
 korek-plugin.workspace = true
-miette = { workspace = true, features = ["fancy"] }
+korek-runtime.workspace = true
 serde_json.workspace = true
-
-[dev-dependencies]
-serde.workspace = true
-tempfile.workspace = true
+thiserror.workspace = true

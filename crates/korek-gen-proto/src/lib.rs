@@ -16,15 +16,15 @@
 
 use core::fmt::Write as _;
 
-use heck::ToShoutySnakeCase as _;
-use korek_core::Diagnostic;
-use korek_core::ir::{
-    Constraints, EnumDef, Idempotency, KeyGroup, Retired, Schema, Service, StructDef, Type,
-    TypeDef, TypeKind, UnionDef, format_number,
+use korek_gen_common::{GENERATED, comment, doc_text};
+use korek_ir::naming::{self, shouty};
+use korek_ir::{
+    Diagnostic, EnumDef, Idempotency, KeyGroup, Retired, RuleKind, Schema, Service, StructDef,
+    Type, TypeDef, TypeKind, UnionDef, Validate,
 };
-use korek_core::naming;
-use korek_plugin::text::{GENERATED, doc_lines};
 use korek_plugin::{File, GenerateRequest, GenerateResponse, Hook, Item};
+
+mod rules;
 
 /// Generator options.
 #[derive(Debug, Clone)]
@@ -61,7 +61,8 @@ pub fn plugin(req: &GenerateRequest) -> Result<GenerateResponse, Diagnostic> {
     if let Some(f) = req.options.get("file") {
         opts.file.clone_from(f);
     }
-    Ok(GenerateResponse::new(generate(&req.schema, &opts, &[])))
+    let (files, warnings) = generate(&req.schema, &opts, &[]);
+    Ok(GenerateResponse::new(files).with_diagnostics(warnings))
 }
 
 /// The `buf.yaml` written next to the generated files.
@@ -84,24 +85,49 @@ struct Gen<'a> {
     out: String,
     /// Whether any `buf.validate` option was written (for the import).
     validates: bool,
+    /// Well-known types used (for imports).
+    timestamp: bool,
+    duration: bool,
+    warnings: Vec<Diagnostic>,
 }
 
-/// Generates the `.proto` file (and `buf.yaml`, and hook files).
-pub fn generate(schema: &Schema, opts: &Options, hooks: &[&dyn Hook]) -> Vec<File> {
+/// Generates the `.proto` file (and `buf.yaml`, and hook files), and
+/// warnings for rules protovalidate cannot express.
+pub fn generate(
+    schema: &Schema,
+    opts: &Options,
+    hooks: &[&dyn Hook],
+) -> (Vec<File>, Vec<Diagnostic>) {
     let mut g = Gen {
         schema,
         opts,
         hooks,
-        out: String::new(),
+        out: String::with_capacity(32 * 1024),
         validates: false,
+        timestamp: false,
+        duration: false,
+        warnings: Vec::new(),
     };
     g.body();
     let mut out = format!(
         "// {GENERATED}\nsyntax = \"proto3\";\n\npackage {};\n",
         schema.package
     );
+    let mut imports = Vec::new();
     if g.validates {
-        out.push_str("\nimport \"buf/validate/validate.proto\";\n");
+        imports.push("buf/validate/validate.proto");
+    }
+    if g.duration {
+        imports.push("google/protobuf/duration.proto");
+    }
+    if g.timestamp {
+        imports.push("google/protobuf/timestamp.proto");
+    }
+    if !imports.is_empty() {
+        out.push('\n');
+        for i in imports {
+            let _ = writeln!(out, "import {i:?};");
+        }
     }
     out.push_str(&g.out);
     for h in hooks {
@@ -115,17 +141,22 @@ pub fn generate(schema: &Schema, opts: &Options, hooks: &[&dyn Hook]) -> Vec<Fil
     for h in hooks {
         files.extend(h.files(schema));
     }
-    files
+    (files, g.warnings)
 }
 
 fn scalar(ty: &Type) -> Option<&'static str> {
     Some(match ty {
         Type::Bool => "bool",
         Type::String => "string",
+        Type::I32 => "int32",
         Type::I64 => "int64",
+        Type::U32 => "uint32",
         Type::U64 => "uint64",
+        Type::F32 => "float",
         Type::F64 => "double",
         Type::Bytes => "bytes",
+        Type::Timestamp => "google.protobuf.Timestamp",
+        Type::Duration => "google.protobuf.Duration",
         _ => return None,
     })
 }
@@ -140,7 +171,7 @@ fn element(ty: &Type) -> String {
 }
 
 /// A Protobuf string literal.
-fn quote(s: &str) -> String {
+pub(crate) fn quote(s: &str) -> String {
     let mut o = String::from('"');
     for c in s.chars() {
         match c {
@@ -169,12 +200,11 @@ impl Gen<'_> {
         let s = self.schema;
         for t in &s.types {
             self.out.push('\n');
-            doc_lines(&mut self.out, "", "// ", t.doc.as_deref());
+            comment(&mut self.out, "", "// ", doc_text(&t.attrs).as_deref());
             match &t.kind {
                 TypeKind::Enum(e) => self.enum_def(&t.name, e),
-                TypeKind::Struct(st) => self.struct_def(&t.name, st),
-                TypeKind::Union(u) => self.union_def(&t.name, u),
-                _ => {}
+                TypeKind::Struct(st) => self.struct_def(&t.name, st, &t.validate),
+                TypeKind::Union(u) => self.union_def(&t.name, u, &t.validate),
             }
             self.after(Item::Type(t));
         }
@@ -205,77 +235,69 @@ impl Gen<'_> {
     }
 
     fn enum_def(&mut self, name: &str, e: &EnumDef) {
-        let prefix = name.to_shouty_snake_case();
+        let prefix = shouty(&snake(name));
         let _ = writeln!(self.out, "enum {name} {{\n  {prefix}_UNSPECIFIED = 0;");
         for v in &e.variants {
-            doc_lines(&mut self.out, "  ", "// ", v.doc.as_deref());
-            let _ = writeln!(
-                self.out,
-                "  {prefix}_{} = {};",
-                v.name.to_shouty_snake_case(),
-                v.number
-            );
+            comment(&mut self.out, "  ", "// ", doc_text(&v.attrs).as_deref());
+            let _ = writeln!(self.out, "  {prefix}_{} = {};", shouty(&v.name), v.number);
         }
         reserved(&mut self.out, &e.retired, |n| {
-            format!("{prefix}_{}", n.to_shouty_snake_case())
+            format!("{prefix}_{}", shouty(n))
         });
         self.out.push_str("}\n");
     }
 
-    /// `buf.validate` rules for a field.
-    fn rules(&mut self, ty: &Type, optional: bool, c: &Constraints) -> Vec<String> {
+    /// `buf.validate` options for a field.
+    fn rules(&mut self, ty: &Type, optional: bool, v: &Validate) -> Vec<String> {
         if !self.opts.protovalidate {
             return Vec::new();
         }
-        let mut r = Vec::new();
-        let kind = self.kind_of(ty);
-        let is_message = matches!(kind, Some(TypeKind::Struct(_) | TypeKind::Union(_)));
-        if !optional && (is_message || *ty == Type::String) {
-            r.push("required = true".to_owned());
+        let kind = self.kind_of(ty).cloned();
+        let mut r = rules::field(ty, kind.as_ref(), v, &mut self.warnings);
+        let is_message = matches!(kind, Some(TypeKind::Struct(_) | TypeKind::Union(_)))
+            || matches!(ty, Type::Timestamp | Type::Duration);
+        if is_message && !optional && !v.has(|k| matches!(k, RuleKind::Required)) {
+            r.set("required", "true".into());
         }
-        if matches!(kind, Some(TypeKind::Enum(_))) {
-            r.push("enum.defined_only = true".to_owned());
+        if r.is_empty() {
+            return Vec::new();
         }
-        let prefix = match ty {
-            Type::I64 => "int64",
-            Type::U64 => "uint64",
-            Type::F64 => "double",
-            Type::String => "string",
-            Type::Bytes => "bytes",
-            Type::List(_) => "repeated",
-            Type::Map(_) => "map",
-            _ => "",
-        };
-        let (min_len, max_len) = match ty {
-            Type::List(_) => ("min_items", "max_items"),
-            Type::Map(_) => ("min_pairs", "max_pairs"),
-            _ => ("min_len", "max_len"),
-        };
-        if let Some(n) = c.min {
-            r.push(format!("{prefix}.gte = {}", format_number(n)));
+        self.validates = true;
+        vec![format!("(buf.validate.field) = {}", r.render())]
+    }
+
+    fn note_wkt(&mut self, ty: &Type) {
+        match ty {
+            Type::Timestamp => self.timestamp = true,
+            Type::Duration => self.duration = true,
+            Type::List(t) | Type::Map(t) => self.note_wkt(t),
+            _ => {}
         }
-        if let Some(n) = c.max {
-            r.push(format!("{prefix}.lte = {}", format_number(n)));
+    }
+
+    /// Message-level CEL rules (`option (buf.validate.message).cel`).
+    fn message_rules(&mut self, v: &Validate) {
+        if !self.opts.protovalidate {
+            return;
         }
-        if let Some(n) = c.min_len {
-            r.push(format!("{prefix}.{min_len} = {n}"));
+        for r in &v.rules {
+            if let RuleKind::Cel { id, expression, .. } = &r.kind {
+                let msg = r.message.clone().unwrap_or_else(|| format!("failed {id}"));
+                let _ = writeln!(
+                    self.out,
+                    "  option (buf.validate.message).cel = {{\n    id: {}\n    message: {}\n    expression: {}\n  }};",
+                    quote(id),
+                    quote(&msg),
+                    quote(expression)
+                );
+                self.validates = true;
+            }
         }
-        if let Some(n) = c.max_len {
-            r.push(format!("{prefix}.{max_len} = {n}"));
-        }
-        if let Some(p) = &c.pattern {
-            r.push(format!("{prefix}.pattern = {}", quote(p)));
-        }
-        if !r.is_empty() {
-            self.validates = true;
-        }
-        r.into_iter()
-            .map(|r| format!("(buf.validate.field).{r}"))
-            .collect()
     }
 
     /// One field line: `[optional|repeated] <type> <name> = <n> [rules];`.
     fn field(&mut self, ty: &Type, name: &str, number: u32, presence: bool, rules: &[String]) {
+        self.note_wkt(ty);
         let decl = match ty {
             Type::List(t) => format!("repeated {}", element(t)),
             Type::Map(t) => format!("map<string, {}>", element(t)),
@@ -283,7 +305,7 @@ impl Gen<'_> {
                 let is_message = matches!(
                     self.kind_of(other),
                     Some(TypeKind::Struct(_) | TypeKind::Union(_))
-                );
+                ) || matches!(other, Type::Timestamp | Type::Duration);
                 let base = element(other);
                 if presence && !is_message {
                     format!("optional {base}")
@@ -305,26 +327,32 @@ impl Gen<'_> {
         self.out.push_str(";\n");
     }
 
-    fn struct_def(&mut self, name: &str, s: &StructDef) {
+    fn struct_def(&mut self, name: &str, s: &StructDef, v: &Validate) {
         let _ = writeln!(self.out, "message {name} {{");
+        self.message_rules(v);
         for f in &s.fields {
-            doc_lines(&mut self.out, "  ", "// ", f.doc.as_deref());
-            let rules = self.rules(&f.ty, f.optional, &f.constraints);
+            comment(&mut self.out, "  ", "// ", doc_text(&f.attrs).as_deref());
+            if let Some(d) = &f.default {
+                let _ = writeln!(self.out, "  // Default: {d}");
+            }
+            let rules = self.rules(&f.ty, f.optional || f.default.is_some(), &f.validate);
             self.field(&f.ty, &f.name, f.number, f.optional, &rules);
         }
         reserved(&mut self.out, &s.retired, str::to_owned);
         self.out.push_str("}\n");
     }
 
-    fn union_def(&mut self, name: &str, u: &UnionDef) {
-        let _ = writeln!(self.out, "message {name} {{\n  oneof value {{");
+    fn union_def(&mut self, name: &str, u: &UnionDef, v: &Validate) {
+        let _ = writeln!(self.out, "message {name} {{");
+        self.message_rules(v);
+        self.out.push_str("  oneof value {\n");
         if self.opts.protovalidate {
             self.out
                 .push_str("    option (buf.validate.oneof).required = true;\n");
             self.validates = true;
         }
         for v in &u.variants {
-            doc_lines(&mut self.out, "    ", "// ", v.doc.as_deref());
+            comment(&mut self.out, "    ", "// ", doc_text(&v.attrs).as_deref());
             let _ = writeln!(
                 self.out,
                 "    {} {} = {};",
@@ -339,17 +367,17 @@ impl Gen<'_> {
     }
 
     fn keys(&mut self, g: &KeyGroup) {
-        doc_lines(&mut self.out, "", "// ", g.doc.as_deref());
+        comment(&mut self.out, "", "// ", doc_text(&g.attrs).as_deref());
         let _ = writeln!(self.out, "message {} {{", naming::keys_type(g));
         for k in &g.keys {
-            doc_lines(&mut self.out, "  ", "// ", k.doc.as_deref());
-            if let Some(d) = &k.default {
-                if k.doc.is_some() {
+            comment(&mut self.out, "  ", "// ", doc_text(&k.attrs).as_deref());
+            if let Some(d) = k.default.as_ref().filter(|_| !k.attrs.secret) {
+                if k.attrs.doc.is_some() {
                     self.out.push_str("  //\n");
                 }
                 let _ = writeln!(self.out, "  // Default: {d}");
             }
-            let rules = self.rules(&k.ty, true, &k.constraints);
+            let rules = self.rules(&k.ty, true, &k.validate);
             self.field(&k.ty, &k.ident(), k.number, true, &rules);
             for h in self.hooks {
                 h.after(Item::Key(g, k), &mut self.out);
@@ -366,7 +394,7 @@ impl Gen<'_> {
             match &t.kind {
                 TypeKind::Struct(st) => used.extend(st.fields.iter().map(|f| (&f.ty, false))),
                 TypeKind::Union(u) => used.extend(u.variants.iter().map(|v| (&v.ty, true))),
-                _ => {}
+                TypeKind::Enum(_) => {}
             }
         }
         for g in &s.keys {
@@ -385,10 +413,10 @@ impl Gen<'_> {
     }
 
     fn service(&mut self, svc: &Service) {
-        doc_lines(&mut self.out, "", "// ", svc.doc.as_deref());
+        comment(&mut self.out, "", "// ", doc_text(&svc.attrs).as_deref());
         let _ = writeln!(self.out, "service {} {{", svc.name);
         for r in &svc.rpcs {
-            doc_lines(&mut self.out, "  ", "// ", r.doc.as_deref());
+            comment(&mut self.out, "  ", "// ", doc_text(&r.attrs).as_deref());
             let _ = write!(
                 self.out,
                 "  rpc {}({}) returns ({})",
@@ -410,4 +438,16 @@ impl Gen<'_> {
         }
         self.out.push_str("}\n");
     }
+}
+
+/// `McpServer` → `mcp_server`.
+fn snake(name: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in name.chars().enumerate() {
+        if c.is_ascii_uppercase() && i > 0 {
+            out.push('_');
+        }
+        out.push(c.to_ascii_lowercase());
+    }
+    out
 }

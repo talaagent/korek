@@ -1,6 +1,6 @@
 [package]
 name = "korek-gen-rust"
-description = "korek's Rust generator: serde types and typed key consts"
+description = "korek's Rust generator: serde types, validate() and typed key consts"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,6 +13,8 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-heck.workspace = true
-korek-core.workspace = true
+korek-gen-common.workspace = true
+korek-ir.workspace = true
 korek-plugin.workspace = true
+korek-runtime.workspace = true
+serde_json.workspace = true

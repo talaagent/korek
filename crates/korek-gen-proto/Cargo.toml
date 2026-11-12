@@ -13,6 +13,11 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-heck.workspace = true
-korek-core.workspace = true
+korek-gen-common.workspace = true
+korek-ir.workspace = true
 korek-plugin.workspace = true
+korek-runtime.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+korek-core.workspace = true

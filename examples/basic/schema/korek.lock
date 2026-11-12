@@ -8,13 +8,15 @@ enum "Backend" {
 keys "claude" {
     item "mcp_servers" 1
     item "model" 2
+    item "api_key" 3
 }
 keys "session" {
     item "steer.enabled" 1
     item "backend" 2
-    item "timeout_s" 3
+    item "timeout" 3
     item "temperature" 4
     item "turn_limit" 5
+    item "max_turns" 6
 }
 struct "Contact" {
     item "id" 1
@@ -23,6 +25,8 @@ struct "Contact" {
     item "score" 4
     item "avatar" 5
     item "tags" 6
+    item "created" 7
+    item "phone" 8
 }
 struct "GetRequest" {
     item "id" 1

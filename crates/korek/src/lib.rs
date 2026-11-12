@@ -1,41 +1,53 @@
 //! korek: define types once in KDL, generate them for many languages.
 //!
-//! This crate is the driver: it loads and validates a schema with
-//! [`korek_core`], then runs one generator plugin per output over the
-//! [`korek_plugin`] protocol, and writes (or, with `check`, compares) the
-//! files they return. The `korek` binary is a thin CLI over [`Driver`].
+//! This crate is the library facade: it re-exports the parser
+//! ([`korek_core`]), the IR ([`ir`]), the plugin protocol ([`plugin`]), the
+//! runtime for generated Rust ([`runtime`]) and, with the default
+//! `generators` feature, the first-party generators ([`generators`]); and it
+//! has the [`Driver`] the `korek` CLI runs.
 //!
 //! ```no_run
 //! use korek::{Driver, Output};
 //!
 //! let report = Driver::new()
+//!     .with_builtins()
 //!     .output(Output::new("rust", "src/generated"))
 //!     .output(Output::new("proto", "proto"))
 //!     .run("schema".as_ref())?;
 //! # Ok::<(), korek::Error>(())
 //! ```
-//!
-//! Generators are plugins: `korek-gen-<name>` on `PATH` (or next to the
-//! running binary), or a path given with [`Driver::plugin`]. Rust code that
-//! wants no subprocess can call the generator crates
-//! (`korek_gen_rust::generate`, …) directly with the IR from
-//! [`korek_core::Loader`].
 
 use alloc::collections::BTreeMap;
-use core::fmt;
 use std::io::Write as _;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
-pub use korek_core;
-use korek_core::{Diagnostic, Extension, Failure, Loader, Severity, Sources};
-pub use korek_plugin;
-use korek_plugin::{ENCODING_ENV, Encoding, GenerateRequest, GenerateResponse};
+pub use korek_core::{self, Extension, Loader, Passthrough};
+pub use korek_ir as ir;
+pub use korek_plugin as plugin;
+pub use korek_runtime as runtime;
+pub use korek_runtime::{Validate, ValidationErrors};
+
+use korek_core::{Sources, codes};
+use korek_ir::{Diagnostic, GenerateRequest, GenerateResponse, Severity};
+use korek_plugin::{ENCODING_ENV, Encoding};
 
 extern crate alloc;
 
-/// One requested output: a plugin name, a directory and the plugin's
-/// options.
+/// The first-party generators, callable in-process.
+#[cfg(feature = "generators")]
+pub mod generators {
+    pub use korek_gen_jsonschema as jsonschema;
+    pub use korek_gen_proto as proto;
+    pub use korek_gen_rust as rust;
+    pub use korek_gen_ts as ts;
+    pub use korek_gen_zod as zod;
+}
+
+/// An in-process generator: the same request and response as a plugin.
+pub type Builtin = fn(&GenerateRequest) -> Result<GenerateResponse, Diagnostic>;
+
+/// One requested output: a plugin name, a directory and options.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Output {
     pub plugin: String,
@@ -77,14 +89,21 @@ pub struct Planned {
     pub plugin: String,
 }
 
+/// How a plugin ran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Via {
+    Builtin,
+    Subprocess,
+}
+
 /// The result of a run.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Report {
     pub files: Vec<Planned>,
-    /// Warnings from plugins.
     pub warnings: Vec<Diagnostic>,
-    /// For rendering warnings.
+    /// How each plugin ran.
+    pub plugins: Vec<(String, Via)>,
     pub sources: Sources,
 }
 
@@ -95,65 +114,55 @@ impl Report {
     }
 }
 
-/// Why a run failed.
-#[derive(Debug)]
+/// A failed run: every diagnostic, with the sources to render them.
+#[derive(Debug, thiserror::Error)]
+#[error("{}", summary(.diagnostics))]
 #[non_exhaustive]
-pub enum Error {
-    /// The schema did not load.
-    Schema(Failure),
-    /// A plugin could not run, or broke the protocol.
-    Plugin { plugin: String, message: String },
-    /// A plugin reported errors.
-    Generate {
-        plugin: String,
-        diagnostics: Vec<Diagnostic>,
-        sources: Sources,
-    },
-    /// `check`: generated files differ from disk.
-    Stale(Vec<PathBuf>),
-    Io {
-        path: PathBuf,
-        error: std::io::Error,
-    },
+pub struct Error {
+    pub diagnostics: Vec<Diagnostic>,
+    pub sources: Sources,
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Schema(e) => write!(f, "the schema has {e}"),
-            Self::Plugin { plugin, message } => write!(f, "plugin `{plugin}`: {message}"),
-            Self::Generate {
-                plugin,
-                diagnostics,
-                ..
-            } => {
-                write!(f, "plugin `{plugin}` failed")?;
-                for d in diagnostics {
-                    write!(f, "\n  {}: {}", d.code, d.message)?;
-                }
-                Ok(())
-            }
-            Self::Stale(paths) => {
-                write!(f, "{} generated file(s) are out of date:", paths.len())?;
-                for p in paths {
-                    write!(f, "\n  {}", p.display())?;
-                }
-                Ok(())
-            }
-            Self::Io { path, error } => write!(f, "{}: {error}", path.display()),
+fn summary(d: &[Diagnostic]) -> String {
+    d.iter()
+        .map(|d| format!("{}: {}", d.code, d.message))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+impl From<korek_core::Failure> for Error {
+    fn from(f: korek_core::Failure) -> Self {
+        Self {
+            diagnostics: f.diagnostics,
+            sources: f.sources,
         }
     }
 }
 
-impl core::error::Error for Error {}
+impl Error {
+    fn one(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            diagnostics: vec![Diagnostic::error(code, message)],
+            sources: Sources::default(),
+        }
+    }
+
+    /// Whether any diagnostic has `code`.
+    pub fn has(&self, code: &str) -> bool {
+        self.diagnostics.iter().any(|d| d.code == code)
+    }
+}
 
 /// Loads a schema and runs plugins over it.
 #[derive(Default)]
 pub struct Driver {
     loader: Loader,
     plugins: BTreeMap<String, PathBuf>,
+    builtins: BTreeMap<String, Builtin>,
     outputs: Vec<Output>,
     check: bool,
+    strict: bool,
+    no_path_lookup: bool,
 }
 
 impl Driver {
@@ -161,21 +170,37 @@ impl Driver {
         Self::default()
     }
 
-    /// Registers an extension (see [`korek_core::Extension`]).
+    /// Registers the first-party generators as in-process builtins.
+    #[cfg(feature = "generators")]
     #[must_use]
-    pub fn extension(mut self, ext: impl Extension + 'static) -> Self {
+    pub fn with_builtins(self) -> Self {
+        self.builtin("rust", korek_gen_rust::plugin)
+            .builtin("proto", korek_gen_proto::plugin)
+            .builtin("zod", korek_gen_zod::plugin)
+            .builtin("ts", korek_gen_ts::plugin)
+            .builtin("jsonschema", korek_gen_jsonschema::plugin)
+    }
+
+    /// Runs `name` in-process unless a binary overrides it.
+    #[must_use]
+    pub fn builtin(mut self, name: impl Into<String>, f: Builtin) -> Self {
+        self.builtins.insert(name.into(), f);
+        self
+    }
+
+    #[must_use]
+    pub fn extension(mut self, ext: impl Extension + Send + Sync + 'static) -> Self {
         self.loader = self.loader.extension(ext);
         self
     }
 
-    /// Uses `path` as the lockfile instead of `<schema>/korek.lock`.
     #[must_use]
     pub fn lock_path(mut self, path: impl Into<PathBuf>) -> Self {
         self.loader = self.loader.lock_path(path);
         self
     }
 
-    /// Runs plugin `name` from `path` instead of `korek-gen-<name>`.
+    /// Runs plugin `name` from `path` (overrides builtins).
     #[must_use]
     pub fn plugin(mut self, name: impl Into<String>, path: impl Into<PathBuf>) -> Self {
         self.plugins.insert(name.into(), path.into());
@@ -195,140 +220,232 @@ impl Driver {
         self
     }
 
-    /// Finds the plugin binary for `name`.
-    fn find(&self, name: &str) -> Result<PathBuf, Error> {
+    /// Treat `korek::rule_unsupported` warnings as errors.
+    #[must_use]
+    pub fn strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
+    }
+
+    /// Don't look for `korek-gen-<name>` on `PATH` (builtins win).
+    #[must_use]
+    pub fn no_path_lookup(mut self, yes: bool) -> Self {
+        self.no_path_lookup = yes;
+        self
+    }
+
+    /// How plugin `name` would run: a binary, or a builtin.
+    fn resolve(&self, name: &str) -> Result<Result<PathBuf, Builtin>, Error> {
         if let Some(p) = self.plugins.get(name) {
-            return Ok(p.clone());
+            return Ok(Ok(p.clone()));
         }
         let exe = format!("korek-gen-{name}{}", std::env::consts::EXE_SUFFIX);
+        if !self.no_path_lookup {
+            let on_path = std::env::var_os("PATH")
+                .into_iter()
+                .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+                .map(|d| d.join(&exe))
+                .find(|p| p.is_file());
+            if let Some(p) = on_path {
+                return Ok(Ok(p));
+            }
+        }
+        if let Some(f) = self.builtins.get(name) {
+            return Ok(Err(*f));
+        }
         let beside = std::env::current_exe()
             .ok()
             .and_then(|p| p.parent().map(|d| d.join(&exe)));
-        let on_path = std::env::var_os("PATH")
-            .into_iter()
-            .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
-            .map(|d| d.join(&exe));
-        on_path
-            .chain(beside)
-            .find(|p| p.is_file())
-            .ok_or_else(|| Error::Plugin {
-                plugin: name.to_owned(),
-                message: format!("`{exe}` is not on PATH (pass --plugin {name}=<path>)"),
-            })
+        beside.filter(|p| p.is_file()).map(Ok).ok_or_else(|| {
+            let mut e = Error::one(
+                codes::PLUGIN_NOT_FOUND,
+                format!("no plugin `{name}`: `{exe}` is not on PATH"),
+            );
+            e.diagnostics[0].help = Some(format!("install it, or pass --plugin {name}=<path>"));
+            e
+        })
     }
 
-    /// Runs one plugin binary.
-    fn invoke(&self, out: &Output, req: &GenerateRequest) -> Result<GenerateResponse, Error> {
-        let fail = |message: String| Error::Plugin {
-            plugin: out.plugin.clone(),
-            message,
-        };
-        let path = self.find(&out.plugin)?;
+    fn invoke(path: &Path, req: &GenerateRequest) -> Result<GenerateResponse, Error> {
+        let fail =
+            |code: &str, m: String| Error::one(code, format!("plugin `{}`: {m}", req.plugin));
         let enc = Encoding::Json;
-        let input = enc.encode(req).map_err(fail)?;
-        let mut child = Command::new(&path)
+        let input = enc
+            .encode(req)
+            .map_err(|e| fail(codes::PLUGIN_PROTOCOL, e))?;
+        let mut child = Command::new(path)
             .env(ENCODING_ENV, enc.name())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| fail(format!("running {}: {e}", path.display())))?;
+            .map_err(|e| {
+                fail(
+                    codes::PLUGIN_FAILED,
+                    format!("running {}: {e}", path.display()),
+                )
+            })?;
         if let Some(mut stdin) = child.stdin.take() {
             stdin
                 .write_all(&input)
-                .map_err(|e| fail(format!("writing the request: {e}")))?;
+                .map_err(|e| fail(codes::PLUGIN_FAILED, format!("writing the request: {e}")))?;
         }
-        let res = child
-            .wait_with_output()
-            .map_err(|e| fail(format!("waiting for {}: {e}", path.display())))?;
+        let res = child.wait_with_output().map_err(|e| {
+            fail(
+                codes::PLUGIN_FAILED,
+                format!("waiting for {}: {e}", path.display()),
+            )
+        })?;
         if !res.status.success() {
             let stderr = String::from_utf8_lossy(&res.stderr);
-            return Err(fail(format!(
-                "{} exited with {}: {}",
-                path.display(),
-                res.status,
-                stderr.trim()
-            )));
+            return Err(fail(
+                codes::PLUGIN_FAILED,
+                format!(
+                    "{} exited with {}: {}",
+                    path.display(),
+                    res.status,
+                    stderr.trim()
+                ),
+            ));
         }
         enc.decode(&res.stdout)
-            .map_err(|e| fail(format!("bad response: {e}")))
+            .map_err(|e| fail(codes::PLUGIN_PROTOCOL, format!("bad response: {e}")))
     }
 
-    /// Loads the schema in `dir`, runs every output's plugin, and writes the
-    /// files (or, with `check`, fails if any differ from disk). The lockfile
-    /// is written alongside.
+    /// Runs one output's plugin.
+    fn generate(
+        &self,
+        out: &Output,
+        schema: &korek_ir::Schema,
+    ) -> Result<(GenerateResponse, Via), Error> {
+        let req =
+            GenerateRequest::new(&out.plugin, schema.clone()).with_options(out.options.clone());
+        match self.resolve(&out.plugin)? {
+            Ok(path) => Self::invoke(&path, &req).map(|r| (r, Via::Subprocess)),
+            Err(f) => Ok((
+                f(&req).unwrap_or_else(GenerateResponse::error),
+                Via::Builtin,
+            )),
+        }
+    }
+
+    /// Loads the schema in `dir`, runs every output's plugin (in parallel),
+    /// and writes the files whose content changed (or, with `check`, fails
+    /// if any differ). The lockfile is written alongside.
     ///
     /// # Errors
-    /// See [`Error`].
+    /// Every diagnostic, from loading, plugins or `check`.
+    #[allow(clippy::too_many_lines)]
     pub fn run(&self, dir: &Path) -> Result<Report, Error> {
-        let loaded = self.loader.load(dir).map_err(Error::Schema)?;
-        let mut files = Vec::new();
-        let mut warnings = Vec::new();
-        for out in &self.outputs {
-            let req = GenerateRequest::new(&out.plugin, loaded.schema.clone())
-                .with_options(out.options.clone());
-            let resp = self.invoke(out, &req)?;
-            let (errors, warns): (Vec<_>, Vec<_>) = resp
-                .diagnostics
+        let loaded = self.loader.load(dir)?;
+        let results: Vec<Result<(GenerateResponse, Via), Error>> = std::thread::scope(|s| {
+            let handles: Vec<_> = self
+                .outputs
+                .iter()
+                .map(|o| s.spawn(|| self.generate(o, &loaded.schema)))
+                .collect();
+            handles
                 .into_iter()
-                .partition(|d| d.severity == Severity::Error);
-            warnings.extend(warns);
-            if !errors.is_empty() {
-                return Err(Error::Generate {
-                    plugin: out.plugin.clone(),
-                    diagnostics: errors,
-                    sources: loaded.sources,
-                });
+                .map(|h| {
+                    h.join().unwrap_or_else(|_| {
+                        Err(Error::one(codes::PLUGIN_FAILED, "a plugin thread panicked"))
+                    })
+                })
+                .collect()
+        });
+        let mut files = Vec::new();
+        let mut warnings = loaded.warnings.clone();
+        let mut errors = Vec::new();
+        let mut plugins = Vec::new();
+        for (out, res) in self.outputs.iter().zip(results) {
+            let (resp, via) = match res {
+                Ok(r) => r,
+                Err(e) => {
+                    errors.extend(e.diagnostics);
+                    continue;
+                }
+            };
+            plugins.push((out.plugin.clone(), via));
+            for mut d in resp.diagnostics {
+                if self.strict && d.code == codes::RULE_UNSUPPORTED {
+                    d.severity = Severity::Error;
+                }
+                if d.is_error() {
+                    errors.push(d);
+                } else {
+                    warnings.push(d);
+                }
             }
             for f in resp.files {
                 let rel = Path::new(&f.path);
                 if rel.is_absolute() || rel.components().any(|c| !matches!(c, Component::Normal(_)))
                 {
-                    return Err(Error::Plugin {
-                        plugin: out.plugin.clone(),
-                        message: format!(
-                            "refusing to write outside the output directory: {}",
-                            f.path
+                    errors.push(Diagnostic::error(
+                        codes::PLUGIN_PROTOCOL,
+                        format!(
+                            "plugin `{}` tried to write outside its output directory: {}",
+                            out.plugin, f.path
                         ),
-                    });
+                    ));
+                    continue;
                 }
                 files.push((out.plugin.clone(), out.dir.join(rel), f.content));
             }
         }
+        if !errors.is_empty() {
+            korek_core::diag::sort(&mut errors);
+            return Err(Error {
+                diagnostics: errors,
+                sources: loaded.sources,
+            });
+        }
         if let Some(p) = &loaded.lock_path {
             files.push(("lock".into(), p.clone(), loaded.lock.render()));
         }
-        let mut planned = Vec::new();
-        for (plugin, path, content) in files {
-            let status = match std::fs::read_to_string(&path) {
-                Ok(old) if old == content => Status::Unchanged,
-                Ok(_) => Status::Changed,
-                Err(_) => Status::New,
-            };
-            planned.push(Planned {
-                path,
-                content,
-                status,
-                plugin,
-            });
-        }
+        let files = files
+            .into_iter()
+            .map(|(plugin, path, content)| {
+                let status = match std::fs::read(&path) {
+                    Ok(old) if old == content.as_bytes() => Status::Unchanged,
+                    Ok(_) => Status::Changed,
+                    Err(_) => Status::New,
+                };
+                Planned {
+                    path,
+                    content,
+                    status,
+                    plugin,
+                }
+            })
+            .collect();
         let report = Report {
-            files: planned,
+            files,
             warnings,
+            plugins,
             sources: loaded.sources,
         };
         if self.check {
-            let stale: Vec<PathBuf> = report.stale().map(|f| f.path.clone()).collect();
+            let stale: Vec<Diagnostic> = report
+                .stale()
+                .map(|f| {
+                    Diagnostic::error(
+                        codes::STALE_OUTPUT,
+                        format!("{} is out of date", f.path.display()),
+                    )
+                    .help("run `korek gen` without --check")
+                })
+                .collect();
             if !stale.is_empty() {
-                return Err(Error::Stale(stale));
+                return Err(Error {
+                    diagnostics: stale,
+                    sources: report.sources,
+                });
             }
             return Ok(report);
         }
         for f in report.stale() {
-            let io = |error| Error::Io {
-                path: f.path.clone(),
-                error,
-            };
+            let io =
+                |e: std::io::Error| Error::one(codes::IO, format!("{}: {e}", f.path.display()));
             if let Some(parent) = f.path.parent() {
                 std::fs::create_dir_all(parent).map_err(io)?;
             }

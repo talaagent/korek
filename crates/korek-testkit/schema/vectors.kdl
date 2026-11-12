@@ -1,0 +1,141 @@
+package "vectors.v1"
+
+struct VMinLen {
+  field v "string" { validate { min_len 2 } }
+}
+
+struct VMaxLen {
+  field v "string" { validate { max_len 3 } }
+}
+
+struct VLen {
+  field v "string" { validate { len 2 } }
+}
+
+struct VMaxBytes {
+  field v "string" { validate { max_bytes 3 } }
+}
+
+struct VPattern {
+  field v "string" { validate { pattern "^[a-z]+$" } }
+}
+
+struct VPrefix {
+  field v "string" { validate { prefix "https://" } }
+}
+
+struct VSuffix {
+  field v "string" { validate { suffix ".kdl" } }
+}
+
+struct VContains {
+  field v "string" { validate { contains "@" } }
+}
+
+struct VNotContains {
+  field v "string" { validate { not_contains " " } }
+}
+
+struct VIn {
+  field v "string" { validate { in "a" "b" } }
+}
+
+struct VNotIn {
+  field v "string" { validate { not_in "root" } }
+}
+
+struct VConst {
+  field v "string" { validate { const "v1" } }
+}
+
+struct VEmail {
+  field v "string" { validate { email } }
+}
+
+struct VUuid {
+  field v "string" { validate { uuid } }
+}
+
+struct VUlid {
+  field v "string" { validate { ulid } }
+}
+
+struct VIpv4 {
+  field v "string" { validate { ipv4 } }
+}
+
+struct VIpv6 {
+  field v "string" { validate { ipv6 } }
+}
+
+struct VUrl {
+  field v "string" { validate { url } }
+}
+
+struct VDate {
+  field v "string" { validate { date } }
+}
+
+struct VDatetime {
+  field v "string" { validate { datetime } }
+}
+
+struct VE164 {
+  field v "string" { validate { e164 } }
+}
+
+struct VLowercase {
+  field v "string" { validate { lowercase } }
+}
+
+struct VBase64 {
+  field v "string" { validate { base64 } }
+}
+
+struct VIntRange {
+  field v "i64" { validate { gte -5; lte 5 } }
+}
+
+struct VExclusive {
+  field v "i32" { validate { gt 0; lt 10 } }
+}
+
+struct VMultipleOf {
+  field v "u32" { validate { multiple_of 5 } }
+}
+
+struct VFloatRange {
+  field v "f64" { validate { gte 0.0; lte 1.0 } }
+}
+
+struct VIntIn {
+  field v "u64" { validate { in 1 2 3 } }
+}
+
+struct VBoolConst {
+  field v "bool" { validate { const #true } }
+}
+
+struct VMinItems {
+  field v "list<string>" { validate { min_items 1; max_items 2 } }
+}
+
+struct VUnique {
+  field v "list<i64>" { validate { unique } }
+}
+
+struct VItems {
+  field v "list<string>" { validate { items { min_len 1 } } }
+}
+
+struct VPairs {
+  field v "map<string,i64>" { validate { max_pairs 1; keys { pattern "^[a-z]+$" }; values { gte 0 } } }
+}
+
+struct VDuration {
+  field v "duration" { validate { gte "1s"; lte "60s" } }
+}
+
+struct VTimestamp {
+  field v "timestamp" { validate { gt "2020-01-01T00:00:00Z" } }
+}

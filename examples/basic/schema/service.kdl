@@ -1,6 +1,6 @@
 struct SearchRequest {
-  field query "string" { min_len 1 }
-  field limit "u64" optional=#true { max 100 }
+  field query "string" { validate { min_len 1 } }
+  field limit "u32" default=20 { validate { gte 1; lte 100 } }
 }
 
 struct SearchResponse {
@@ -8,7 +8,7 @@ struct SearchResponse {
 }
 
 struct GetRequest {
-  field id "string"
+  field id "string" { validate { uuid } }
 }
 
 struct GetResponse {

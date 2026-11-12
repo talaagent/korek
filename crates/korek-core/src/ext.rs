@@ -11,8 +11,7 @@
 use kdl::{KdlEntry, KdlNode, KdlValue};
 use serde_json::Value;
 
-use crate::diag::Diagnostic;
-use crate::ir::{Schema, Span};
+use korek_ir::{Diagnostic, Schema, Span};
 
 /// Where a claimed child node or property appeared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,14 +103,20 @@ pub struct Node<'a> {
     pub(crate) file: u32,
 }
 
-pub(crate) fn span_of(file: u32, s: miette::SourceSpan) -> Span {
-    #[allow(clippy::cast_possible_truncation)]
-    Span {
-        file,
-        offset: s.offset() as u32,
-        len: s.len() as u32,
-    }
+/// A korek span from a kdl span (whose type comes from miette, which
+/// korek-core does not depend on by default).
+macro_rules! span_of {
+    ($file:expr, $s:expr) => {{
+        let s = $s;
+        #[allow(clippy::cast_possible_truncation)]
+        korek_ir::Span {
+            file: $file,
+            offset: s.offset() as u32,
+            len: s.len() as u32,
+        }
+    }};
 }
+pub(crate) use span_of;
 
 impl<'a> Node<'a> {
     pub fn name(&self) -> &'a str {
@@ -119,18 +124,18 @@ impl<'a> Node<'a> {
     }
 
     pub fn span(&self) -> Span {
-        span_of(self.file, self.inner.span())
+        span_of!(self.file, self.inner.span())
     }
 
     /// The span of the node's name.
     pub fn name_span(&self) -> Span {
-        span_of(self.file, self.inner.name().span())
+        span_of!(self.file, self.inner.name().span())
     }
 
     fn arg_of(&self, e: &KdlEntry) -> Arg {
         Arg {
             value: Literal::from_kdl(e.value()),
-            span: span_of(self.file, e.span()),
+            span: span_of!(self.file, e.span()),
         }
     }
 

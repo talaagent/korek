@@ -1,8 +1,7 @@
 //! The driver runs this plugin over the protocol; extension metadata
 //! reaches it without any change to korek.
 
-use korek::{Driver, Output};
-use korek_core::Passthrough;
+use korek::{Driver, Output, Passthrough};
 
 #[test]
 fn driver_runs_the_example_plugin() {

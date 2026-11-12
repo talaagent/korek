@@ -1,0 +1,22 @@
+[package]
+name = "korek-runtime"
+description = "The small runtime korek's generated Rust uses: validation errors, string formats, base64"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["regex"]
+# `pattern` rules and the emoji format.
+regex = ["dep:regex"]
+
+[dependencies]
+regex = { workspace = true, optional = true }
+serde.workspace = true

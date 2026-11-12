@@ -7,11 +7,12 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use bpaf::{Parser, construct, long, positional};
-use korek::{Driver, Error, Output};
-use korek_core::{Loader, Passthrough};
+use korek::korek_core::{Failure, Sources};
+use korek::{Driver, Loader, Output, Passthrough};
 
 #[derive(Debug, Clone)]
 struct Common {
+    json: bool,
     exts: Vec<String>,
     lock: Option<PathBuf>,
     dir: PathBuf,
@@ -24,6 +25,8 @@ struct GenArgs {
     plugins: Vec<String>,
     plugin_opts: Vec<String>,
     check: bool,
+    strict: bool,
+    no_builtin: bool,
     common: Common,
 }
 
@@ -44,7 +47,18 @@ fn common_args() -> impl Parser<Common> {
         .argument::<PathBuf>("FILE")
         .optional();
     let dir = positional::<PathBuf>("SCHEMA_DIR").help("The directory of .kdl schema files");
-    construct!(Common { exts, lock, dir })
+    let json = long("message-format")
+        .help("How to print diagnostics: human (default) or json")
+        .argument::<String>("FORMAT")
+        .guard(|f| f == "human" || f == "json", "expected human or json")
+        .fallback("human".into())
+        .map(|f| f == "json");
+    construct!(Common {
+        json,
+        exts,
+        lock,
+        dir
+    })
 }
 
 fn builtin(
@@ -65,7 +79,9 @@ fn parser() -> impl Parser<Cmd> {
     let proto = builtin("proto", "Write Protobuf (protovalidate, services) to DIR");
     let zod = builtin("zod", "Write TypeScript Zod schemas to DIR");
     let ts = builtin("ts", "Write bare TypeScript types to DIR");
-    let builtin = construct!(rust, proto, zod, ts).map(|(a, b, c, d)| vec![a, b, c, d]);
+    let jsonschema = builtin("jsonschema", "Write JSON Schema (2020-12) to DIR");
+    let builtin =
+        construct!(rust, proto, zod, ts, jsonschema).map(|(a, b, c, d, e)| vec![a, b, c, d, e]);
     let outs = long("out")
         .help("Run plugin korek-gen-NAME into DIR")
         .argument::<String>("NAME=DIR")
@@ -81,6 +97,12 @@ fn parser() -> impl Parser<Cmd> {
     let check = long("check")
         .help("Fail if any generated file is out of date; write nothing")
         .switch();
+    let strict = long("strict")
+        .help("Fail when a generator cannot express a rule (korek::rule_unsupported)")
+        .switch();
+    let no_builtin = long("no-builtin")
+        .help("Always run plugins as subprocesses")
+        .switch();
     let common = common_args();
     let gen_cmd = construct!(GenArgs {
         builtin,
@@ -88,6 +110,8 @@ fn parser() -> impl Parser<Cmd> {
         plugins,
         plugin_opts,
         check,
+        strict,
+        no_builtin,
         common
     })
     .map(Cmd::Gen)
@@ -131,14 +155,26 @@ fn loader(c: &Common) -> Loader {
     l
 }
 
-fn print_failure(f: &korek_core::Failure) {
-    for r in f.rendered() {
-        eprintln!("{:?}", miette::Report::new(r));
+fn print_diagnostics(d: &[korek::ir::Diagnostic], sources: &Sources, json: bool) {
+    for d in d {
+        if json {
+            println!("{}", korek::korek_core::diag::diagnostic_json(d, sources));
+        } else {
+            let r = korek::korek_core::diag::Rendered::new(d, sources);
+            eprintln!("{:?}", miette::Report::new(r));
+        }
     }
 }
 
+fn print_failure(f: &Failure, json: bool) {
+    print_diagnostics(&f.diagnostics, &f.sources, json);
+}
+
 fn gen_driver(a: &GenArgs) -> Result<Driver, String> {
-    let mut d = Driver::new().check(a.check);
+    let mut d = Driver::new().check(a.check).strict(a.strict);
+    if !a.no_builtin {
+        d = with_builtins(d);
+    }
     for e in &a.common.exts {
         d = d.extension(Passthrough::new(e));
     }
@@ -171,7 +207,9 @@ fn gen_driver(a: &GenArgs) -> Result<Driver, String> {
         outputs.push(Output::new(n, dir));
     }
     if outputs.is_empty() {
-        return Err("nothing to generate: pass --rust, --proto, --zod, --ts or --out".into());
+        return Err(
+            "nothing to generate: pass --rust, --proto, --zod, --ts, --jsonschema or --out".into(),
+        );
     }
     for mut o in outputs {
         if let Some(x) = extra.remove(&o.plugin) {
@@ -185,6 +223,16 @@ fn gen_driver(a: &GenArgs) -> Result<Driver, String> {
     Ok(d)
 }
 
+#[cfg(feature = "builtin")]
+fn with_builtins(d: Driver) -> Driver {
+    d.with_builtins()
+}
+
+#[cfg(not(feature = "builtin"))]
+fn with_builtins(d: Driver) -> Driver {
+    d
+}
+
 fn run_gen(a: &GenArgs) -> ExitCode {
     let d = match gen_driver(a) {
         Ok(d) => d,
@@ -193,33 +241,19 @@ fn run_gen(a: &GenArgs) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    let json = a.common.json;
     match d.run(&a.common.dir) {
         Ok(report) => {
-            for w in &report.warnings {
-                eprintln!("{:?}", miette::Report::new(w.render(&report.sources)));
-            }
-            for f in report.stale() {
-                println!("wrote {}", f.path.display());
+            print_diagnostics(&report.warnings, &report.sources, json);
+            if !json {
+                for f in report.stale() {
+                    println!("wrote {}", f.path.display());
+                }
             }
             ExitCode::SUCCESS
         }
-        Err(Error::Schema(f)) => {
-            print_failure(&f);
-            ExitCode::FAILURE
-        }
-        Err(Error::Generate {
-            plugin,
-            diagnostics,
-            sources,
-        }) => {
-            eprintln!("error: plugin `{plugin}` failed");
-            for d in diagnostics {
-                eprintln!("{:?}", miette::Report::new(d.render(&sources)));
-            }
-            ExitCode::FAILURE
-        }
         Err(e) => {
-            eprintln!("error: {e}");
+            print_diagnostics(&e.diagnostics, &e.sources, json);
             ExitCode::FAILURE
         }
     }
@@ -228,7 +262,7 @@ fn run_gen(a: &GenArgs) -> ExitCode {
 fn main() -> ExitCode {
     let cmd = parser()
         .to_options()
-        .descr("korek: define types once, generate Rust, Protobuf, Zod and TypeScript")
+        .descr("korek: define your types once, get them correct everywhere")
         .version(env!("CARGO_PKG_VERSION"))
         .run();
     match cmd {
@@ -242,10 +276,11 @@ fn run_load(c: &Common, ir: bool) -> ExitCode {
     let l = match loader(c).load(&c.dir) {
         Ok(l) => l,
         Err(f) => {
-            print_failure(&f);
+            print_failure(&f, c.json);
             return ExitCode::FAILURE;
         }
     };
+    print_diagnostics(&l.warnings, &l.sources, c.json);
     if ir {
         match serde_json::to_string_pretty(&l.schema) {
             Ok(s) => println!("{s}"),

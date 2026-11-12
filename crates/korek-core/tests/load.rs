@@ -1,5 +1,7 @@
 //! Loading the example schema, and the errors for bad schemas.
 
+extern crate alloc;
+
 use std::path::Path;
 
 use korek_core::ir::TypeKind;
@@ -27,7 +29,7 @@ fn fails(src: &str, code: &str) -> Failure {
     let f = load(src).expect_err("expected an error");
     assert!(f.has(code), "expected {code}, got:\n{f}");
     for d in &f.diagnostics {
-        assert!(d.span.is_some(), "{d:?} has no span");
+        assert!(d.span().is_some(), "{d:?} has no span");
     }
     f
 }
@@ -43,8 +45,13 @@ fn loads_the_example() {
     };
     assert_eq!(u.tag.as_deref(), Some("type"));
     let session = &s.keys[0];
-    assert_eq!(session.keys[2].default, Some(serde_json::json!(600)));
+    assert_eq!(session.keys[2].default, Some(serde_json::json!("600s")));
     assert_eq!(session.keys[3].default, Some(serde_json::json!(0.7)));
+    let t = s.get("McpStdio").unwrap();
+    assert_eq!(t.attrs.examples.len(), 1);
+    let claude = &s.keys[1];
+    assert!(claude.keys[2].attrs.secret);
+    assert_eq!(claude.keys[2].attrs.meta[0].namespace, "acme.ui");
     assert_eq!(s.services[0].rpcs.len(), 2);
 }
 
@@ -128,14 +135,14 @@ fn unknown_type_suggests() {
 
 #[test]
 fn duplicate_names() {
-    fails("struct A {}\nenum A { variant x }", "korek::duplicate");
+    fails("struct A {}\nenum A { variant x }", "korek::duplicate_name");
     fails(
         "struct A { field x \"string\"; field x \"i64\" }",
-        "korek::duplicate",
+        "korek::duplicate_name",
     );
     fails(
         "keys \"s\" { key \"a.b\" \"bool\"; key \"a_b\" \"bool\" }",
-        "korek::duplicate",
+        "korek::duplicate_name",
     );
     fails(
         "struct SessionKeys {}\nkeys \"session\" {}",
@@ -147,56 +154,56 @@ fn duplicate_names() {
 fn bad_defaults() {
     fails(
         "keys \"s\" { key \"a\" \"bool\" default=\"yes\" }",
-        "korek::bad_default",
+        "korek::invalid_default",
     );
     fails(
         "keys \"s\" { key \"a\" \"u64\" default=-1 }",
-        "korek::bad_default",
+        "korek::invalid_default",
     );
     fails(
         "enum E { variant x }\nkeys \"s\" { key \"a\" \"E\" default=\"y\" }",
-        "korek::bad_default",
+        "korek::invalid_default",
     );
     fails(
         "keys \"s\" { key \"a\" \"list<i64>\" default=\"[1, \\\"x\\\"]\" }",
-        "korek::bad_default",
+        "korek::invalid_default",
     );
     fails(
         "struct P { field n \"string\" }\nkeys \"s\" { key \"a\" \"P\" default=\"{}\" }",
-        "korek::bad_default",
+        "korek::invalid_default",
     );
 }
 
 #[test]
 fn constraint_violations() {
     fails(
-        "keys \"s\" { key \"a\" \"u64\" default=0 { min 1 } }",
-        "korek::bad_default",
+        "keys \"s\" { key \"a\" \"u64\" default=0 { validate { gte 1 } } }",
+        "korek::invalid_default",
     );
     fails(
-        "keys \"s\" { key \"a\" \"string\" default=\"x\" { min_len 2 } }",
-        "korek::bad_default",
+        "keys \"s\" { key \"a\" \"string\" default=\"x\" { validate { min_len 2 } } }",
+        "korek::invalid_default",
     );
     fails(
-        "keys \"s\" { key \"a\" \"string\" default=\"x\" { pattern \"^y\" } }",
-        "korek::bad_default",
+        "keys \"s\" { key \"a\" \"string\" default=\"x\" { validate { pattern \"^y\" } } }",
+        "korek::invalid_default",
     );
     fails(
-        "struct A { field a \"bool\" { min 1 } }",
-        "korek::bad_constraint",
+        "struct A { field a \"bool\" { validate { gte 1 } } }",
+        "korek::invalid_rule",
     );
     fails(
-        "struct A { field a \"i64\" { min 2; max 1 } }",
-        "korek::bad_constraint",
+        "struct A { field a \"i64\" { validate { gte 2; lte 1 } } }",
+        "korek::invalid_rule",
     );
     fails(
-        "struct A { field a \"string\" { pattern \"(\" } }",
-        "korek::bad_constraint",
+        "struct A { field a \"string\" { validate { pattern \"(\" } } }",
+        "korek::invalid_rule",
     );
     // Nested field constraints apply to defaults too.
     fails(
-        "struct P { field n \"i64\" { max 3 } }\nkeys \"s\" { key \"a\" \"P\" default=#\"{\"n\": 4}\"# }",
-        "korek::bad_default",
+        "struct P { field n \"i64\" { validate { lte 3 } } }\nkeys \"s\" { key \"a\" \"P\" default=#\"{\"n\": 4}\"# }",
+        "korek::invalid_default",
     );
 }
 
@@ -204,36 +211,52 @@ fn constraint_violations() {
 fn structural_errors() {
     fails("struct A { fild x \"string\" }", "korek::unknown_node");
     fails(
+        "struct A { field x \"string\" { validate { emial } } }",
+        "korek::unknown_rule",
+    );
+    fails(
+        "struct A { field x \"string\" { example 5 } }",
+        "korek::invalid_example",
+    );
+    fails(
+        "struct A { field x \"u32\" default=5000000000 }",
+        "korek::invalid_default",
+    );
+    fails(
+        "struct A { field x \"list<string>\" { validate { keys { min_len 1 } } } }",
+        "korek::invalid_rule",
+    );
+    fails(
         "struct A { field x \"string\" opt=#true }",
         "korek::unknown_property",
     );
     fails("widget A {}", "korek::unknown_node");
     fails(
         "union U tag=\"t\" { variant a \"string\" }",
-        "korek::bad_union",
+        "korek::invalid_union",
     );
     fails(
         "struct A { field t \"string\" }\nunion U tag=\"t\" { variant a \"A\" }",
-        "korek::tag_clash",
+        "korek::invalid_union",
     );
     fails(
         "struct A { field b \"B\" }\nstruct B { field a \"list<A>\" }",
-        "korek::recursive_type",
+        "korek::cycle",
     );
-    fails("struct a {}", "korek::bad_name");
-    fails("enum E { variant unspecified }", "korek::bad_name");
+    fails("struct a {}", "korek::invalid_name");
+    fails("enum E { variant unspecified }", "korek::invalid_name");
     fails(
         "struct A { field x \"map<i64,string>\" }",
-        "korek::bad_type",
+        "korek::invalid_type",
     );
-    fails("struct A { field x \"string\" id=0 }", "korek::bad_id");
+    fails("struct A { field x \"string\" id=0 }", "korek::invalid_id");
     fails(
         "struct A { field x \"string\" id=2; field y \"string\" id=2 }",
         "korek::duplicate_id",
     );
     fails(
         "enum E { variant x }\nservice S { rpc Do input=\"E\" output=\"E\" }",
-        "korek::bad_rpc",
+        "korek::invalid_rpc",
     );
     fails("struct A {", "korek::syntax");
 }
@@ -242,16 +265,49 @@ fn structural_errors() {
 fn errors_render_with_spans() {
     let f = fails("struct A {\n  field b \"Nope\"\n}", "korek::unknown_type");
     let d = &f.diagnostics[0];
-    let span = d.span.unwrap();
+    let span = d.span().unwrap();
     let src = "struct A {\n  field b \"Nope\"\n}";
     assert_eq!(
         &src[span.offset as usize..(span.offset + span.len) as usize],
         "\"Nope\""
     );
-    let mut out = String::new();
-    miette::GraphicalReportHandler::new_themed(miette::GraphicalTheme::unicode_nocolor())
-        .render_report(&mut out, &f.rendered()[0])
-        .unwrap();
-    assert!(out.contains("test.kdl:2:11"), "{out}");
-    assert!(out.contains("korek::unknown_type"), "{out}");
+    #[cfg(feature = "miette")]
+    {
+        let mut out = String::new();
+        miette::GraphicalReportHandler::new_themed(miette::GraphicalTheme::unicode_nocolor())
+            .render_report(&mut out, &f.rendered()[0])
+            .unwrap();
+        assert!(out.contains("test.kdl:2:11"), "{out}");
+        assert!(out.contains("korek::unknown_type"), "{out}");
+    }
+}
+
+#[test]
+fn every_code_is_documented() {
+    let docs =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/errors.md"))
+            .unwrap();
+    let documented: alloc::collections::BTreeSet<String> = docs
+        .lines()
+        .filter_map(|l| l.strip_prefix("## `").and_then(|l| l.strip_suffix('`')))
+        .map(str::to_owned)
+        .collect();
+    let in_code: alloc::collections::BTreeSet<String> = korek_core::codes::ALL
+        .iter()
+        .map(|(c, _, _)| (*c).to_owned())
+        .collect();
+    assert_eq!(
+        documented, in_code,
+        "docs/errors.md and korek_ir::codes::ALL differ"
+    );
+}
+
+#[test]
+fn diagnostics_have_json_form() {
+    let f = fails("struct A {\n  field b \"Nope\"\n}", "korek::unknown_type");
+    let j = f.to_json();
+    assert_eq!(j[0]["code"], "korek::unknown_type");
+    assert_eq!(j[0]["labels"][0]["line"], 2);
+    assert_eq!(j[0]["labels"][0]["col"], 11);
+    assert_eq!(j[0]["labels"][0]["file"], "test.kdl");
 }

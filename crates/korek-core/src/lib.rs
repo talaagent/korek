@@ -1,5 +1,5 @@
 //! korek's front end: load a directory of KDL schema files, lower them to
-//! the [IR](ir), validate it and assign stable Protobuf numbers.
+//! the IR ([`korek_ir`]), validate it and assign stable Protobuf numbers.
 //!
 //! ```no_run
 //! let schema = korek_core::load("schema".as_ref())?;
@@ -10,31 +10,32 @@
 //! ```
 //!
 //! Domain-specific nodes are handled by [`Extension`]s registered on a
-//! [`Loader`]; their metadata lands in the IR's `ext` maps.
+//! [`Loader`]; their metadata lands in the IR's `ext` maps. With the
+//! `miette` feature, [`Failure::rendered`] gives `miette` diagnostics.
 
 extern crate alloc;
 
+mod check;
 pub mod diag;
 pub mod ext;
-pub mod ir;
 pub mod lock;
-pub mod naming;
 mod parse;
+pub mod source;
 pub mod types;
 mod validate;
-pub mod value;
 
 use std::path::{Path, PathBuf};
 
-pub use diag::{Diagnostic, Failure, Severity, SourceFile, Sources};
-pub use ext::{Extension, ItemKind, Passthrough};
-pub use ir::Schema;
+pub use diag::Failure;
+pub use ext::{Extension, ItemKind, Node, Passthrough};
+pub use korek_ir as ir;
+pub use korek_ir::{Diagnostic, Schema, Severity, codes};
 pub use lock::{LOCK_FILE, Lock};
+pub use source::{SourceFile, Sources};
 
 /// Where the lockfile comes from.
 #[derive(Debug, Clone, Default)]
 enum LockAt {
-    /// `korek.lock` in the schema directory.
     #[default]
     InDir,
     Path(PathBuf),
@@ -43,7 +44,7 @@ enum LockAt {
 /// Loads schemas, with extensions and a lockfile location.
 #[derive(Default)]
 pub struct Loader {
-    exts: Vec<Box<dyn Extension>>,
+    exts: Vec<Box<dyn Extension + Send + Sync>>,
     lock: LockAt,
 }
 
@@ -57,6 +58,8 @@ pub struct Loaded {
     pub lock: Lock,
     /// Where the lockfile lives (when loaded from a directory).
     pub lock_path: Option<PathBuf>,
+    /// Warnings.
+    pub warnings: Vec<Diagnostic>,
 }
 
 /// Loads every `.kdl` file under `dir` with no extensions.
@@ -68,25 +71,13 @@ pub fn load(dir: &Path) -> Result<Schema, Failure> {
 }
 
 fn io_failure(path: &Path, e: &std::io::Error) -> Failure {
-    Failure {
-        diagnostics: vec![Diagnostic::error(
-            "korek::io",
+    Failure::new(
+        vec![Diagnostic::error(
+            codes::IO,
             format!("{}: {e}", path.display()),
         )],
-        sources: Sources::default(),
-    }
-}
-
-fn kdl_files(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let path = entry?.path();
-        if path.is_dir() {
-            kdl_files(&path, out)?;
-        } else if path.extension().is_some_and(|e| e == "kdl") {
-            out.push(path);
-        }
-    }
-    Ok(())
+        Sources::default(),
+    )
 }
 
 impl Loader {
@@ -96,7 +87,7 @@ impl Loader {
 
     /// Registers an extension.
     #[must_use]
-    pub fn extension(mut self, ext: impl Extension + 'static) -> Self {
+    pub fn extension(mut self, ext: impl Extension + Send + Sync + 'static) -> Self {
         self.exts.push(Box::new(ext));
         self
     }
@@ -114,18 +105,7 @@ impl Loader {
     /// # Errors
     /// Every problem found, with spans.
     pub fn load(&self, dir: &Path) -> Result<Loaded, Failure> {
-        let mut paths = Vec::new();
-        kdl_files(dir, &mut paths).map_err(|e| io_failure(dir, &e))?;
-        paths.sort();
-        let mut files = Vec::new();
-        for p in &paths {
-            let contents = std::fs::read_to_string(p).map_err(|e| io_failure(p, &e))?;
-            let rel = p.strip_prefix(dir).unwrap_or(p);
-            files.push(SourceFile {
-                path: rel.to_string_lossy().replace('\\', "/"),
-                contents,
-            });
-        }
+        let files = source::read_dir(dir).map_err(|(p, e)| io_failure(&p, &e))?;
         let lock_path = match &self.lock {
             LockAt::InDir => dir.join(LOCK_FILE),
             LockAt::Path(p) => p.clone(),
@@ -152,21 +132,15 @@ impl Loader {
         files: Vec<SourceFile>,
         lock: Option<SourceFile>,
     ) -> Result<Loaded, Failure> {
-        let mut p = parse::Parser::new(&self.exts);
+        let exts: Vec<&dyn Extension> = self.exts.iter().map(|e| &**e as &dyn Extension).collect();
+        let mut p = parse::Parser::new(&exts);
         for f in &files {
             p.file(f);
         }
         let mut sources = Sources { files };
-        let fail = |diagnostics, sources| {
-            Err(Failure {
-                diagnostics,
-                sources,
-            })
-        };
         if !p.diags.is_empty() {
-            return fail(p.diags, sources);
+            return Err(Failure::new(p.diags, sources));
         }
-        let mut diags = Vec::new();
         let old = match lock {
             Some(l) => {
                 #[allow(clippy::cast_possible_truncation)]
@@ -175,7 +149,7 @@ impl Loader {
                 sources.files.push(l);
                 match parsed {
                     Ok(lock) => lock,
-                    Err(d) => return fail(d, sources),
+                    Err(d) => return Err(Failure::new(d, sources)),
                 }
             }
             None => Lock::default(),
@@ -185,33 +159,59 @@ impl Loader {
             aux: &p.aux,
             diags: Vec::new(),
             resolved: Vec::new(),
+            examples: Vec::new(),
         };
         v.run();
-        let resolved = core::mem::take(&mut v.resolved);
-        diags.append(&mut v.diags);
+        let (resolved, examples, mut diags) = (v.resolved, v.examples, v.diags);
         let mut schema = p.schema;
         let new_lock = lock::assign(&mut schema, &p.aux.id, &old, &mut diags);
-        for g in &mut schema.keys {
-            for k in &mut g.keys {
-                k.default = resolved
-                    .iter()
-                    .find(|(s, _)| *s == k.span)
-                    .map(|(_, j)| j.clone());
-            }
-        }
+        finish(&mut schema, &resolved, &examples);
         if diags.is_empty() {
             for x in &self.exts {
                 diags.extend(x.check(&schema));
             }
         }
-        if diags.iter().any(|d| d.severity == Severity::Error) {
-            return fail(diags, sources);
+        if diags.iter().any(Diagnostic::is_error) {
+            return Err(Failure::new(diags, sources));
         }
+        diag::sort(&mut diags);
         Ok(Loaded {
             schema,
             sources,
             lock: new_lock,
             lock_path: None,
+            warnings: diags,
         })
+    }
+}
+
+/// Moves resolved defaults and examples into the IR.
+fn finish(
+    schema: &mut Schema,
+    resolved: &[(ir::Span, ir::Json)],
+    examples: &[(ir::Span, Vec<ir::Json>)],
+) {
+    let default = |s: ir::Span| resolved.iter().find(|r| r.0 == s).map(|r| r.1.clone());
+    let examples_of = |s: ir::Span| {
+        examples
+            .iter()
+            .find(|e| e.0 == s)
+            .map(|e| e.1.clone())
+            .unwrap_or_default()
+    };
+    for t in &mut schema.types {
+        t.attrs.examples = examples_of(t.span);
+        if let ir::TypeKind::Struct(s) = &mut t.kind {
+            for f in &mut s.fields {
+                f.default = default(f.span);
+                f.attrs.examples = examples_of(f.span);
+            }
+        }
+    }
+    for g in &mut schema.keys {
+        for k in &mut g.keys {
+            k.default = default(k.span);
+            k.attrs.examples = examples_of(k.span);
+        }
     }
 }

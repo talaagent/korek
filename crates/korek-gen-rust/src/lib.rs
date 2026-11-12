@@ -1,27 +1,25 @@
-//! Rust: serde types for every named type, and a module of typed key
-//! consts (`pub const STEER_ENABLED: Key<bool>`) per keys block.
+//! Rust: serde types, a `korek_runtime::Validate` impl per type, `Default`
+//! impls where every field has a default, and a `keys` module of typed key
+//! consts (`pub const SESSION_STEER_ENABLED: Key<bool>`).
 //!
 //! The output is one file, `types.rs` by default (option `file`), with no
-//! `use` items and no inner attributes, so it can be `include!`d anywhere.
-//! It needs `serde` (with `derive`) in the including crate.
+//! `use` items and no inner attributes, so it can be `include!`d. It needs
+//! `serde` (with `derive`) and `korek-runtime` in the including crate.
+
+mod validate;
 
 use core::fmt::Write as _;
 
-use heck::{ToShoutySnakeCase as _, ToSnakeCase as _, ToUpperCamelCase as _};
-use korek_core::Diagnostic;
-use korek_core::ir::{
-    Constraints, EnumDef, KeyGroup, Schema, StructDef, Type, TypeDef, TypeKind, UnionDef,
-    format_number,
-};
-use korek_core::value::{Value, resolve};
-use korek_plugin::text::{GENERATED, doc_lines};
+use korek_gen_common::{GENERATED, comment, doc_text, rust_ident};
+use korek_ir::naming::{pascal, shouty};
+use korek_ir::value::{Value, resolve};
+use korek_ir::{Diagnostic, Field, Key, KeyGroup, Schema, Type, TypeDef, TypeKind};
 use korek_plugin::{File, GenerateRequest, GenerateResponse, Hook, Item};
 
 /// Generator options.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Options {
-    /// The output file name.
     pub file: String,
 }
 
@@ -43,303 +41,339 @@ pub fn plugin(req: &GenerateRequest) -> Result<GenerateResponse, Diagnostic> {
     if let Some(f) = req.options.get("file") {
         opts.file.clone_from(f);
     }
-    Ok(GenerateResponse::new(generate(&req.schema, &opts, &[])))
+    let (files, warnings) = generate(&req.schema, &opts, &[]);
+    Ok(GenerateResponse::new(files).with_diagnostics(warnings))
 }
 
-/// Generates the Rust file (plus any files the hooks add).
-pub fn generate(schema: &Schema, opts: &Options, hooks: &[&dyn Hook]) -> Vec<File> {
-    let mut out = format!("// {GENERATED}\n");
-    if !schema.keys.is_empty() {
-        out.push_str(KEY_TYPES);
-    }
-    for t in &schema.types {
-        out.push('\n');
-        type_def(&mut out, t);
-        for h in hooks {
-            h.after(Item::Type(t), &mut out);
-        }
-    }
-    for g in &schema.keys {
-        out.push('\n');
-        key_group(&mut out, schema, g, hooks);
-    }
-    for h in hooks {
-        h.footer(schema, &mut out);
-    }
-    let mut files = vec![File::new(&opts.file, out)];
-    for h in hooks {
-        files.extend(h.files(schema));
-    }
-    files
-}
-
-const KEY_TYPES: &str = r#"
-/// A typed key: its name, documentation, default and constraints.
-pub struct Key<T> {
-    /// The keys block, e.g. `session`.
-    pub group: &'static str,
-    /// The key within its block, e.g. `steer.enabled`.
-    pub name: &'static str,
-    pub doc: &'static str,
-    /// Builds the default value.
-    pub default: Option<fn() -> T>,
-    /// The default as JSON.
-    pub default_json: Option<&'static str>,
-    pub constraints: &'static [Constraint],
-}
-
-impl<T> Key<T> {
-    /// `group.name`.
-    pub fn path(&self) -> String {
-        format!("{}.{}", self.group, self.name)
-    }
-
-    /// The default value, if the key has one.
-    pub fn default_value(&self) -> Option<T> {
-        self.default.map(|f| f())
-    }
-}
-
-impl<T> Clone for Key<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for Key<T> {}
-
-impl<T> ::core::fmt::Debug for Key<T> {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("Key")
-            .field("group", &self.group)
-            .field("name", &self.name)
-            .field("default_json", &self.default_json)
-            .field("constraints", &self.constraints)
-            .finish_non_exhaustive()
-    }
-}
-
-/// A value constraint on a key or field. Bounds are inclusive.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Constraint {
-    Min(f64),
-    Max(f64),
-    MinLen(u64),
-    MaxLen(u64),
-    /// A regular expression the value must match.
-    Pattern(&'static str),
-}
-"#;
-
-const KEYWORDS: &[&str] = &[
-    "as", "async", "await", "break", "const", "continue", "dyn", "else", "enum", "extern", "false",
-    "fn", "for", "gen", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
-    "ref", "return", "static", "struct", "trait", "true", "type", "unsafe", "use", "where",
-    "while", "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try",
-    "typeof", "unsized", "virtual", "yield",
-];
-
-/// A field or module name, raw when it is a keyword.
-fn ident(name: &str) -> String {
-    if KEYWORDS.contains(&name) {
-        format!("r#{name}")
-    } else {
-        name.to_owned()
-    }
-}
+pub(crate) const RT: &str = "::korek_runtime";
+const SERDE: &str = "::serde::Serialize, ::serde::Deserialize";
 
 /// The Rust type for `ty`.
 pub fn rust_type(ty: &Type) -> String {
     match ty {
         Type::Bool => "bool".into(),
-        Type::String => "String".into(),
-        Type::I64 => "i64".into(),
-        Type::U64 => "u64".into(),
-        Type::F64 => "f64".into(),
+        Type::String | Type::Timestamp | Type::Duration => "String".into(),
         Type::Bytes => "Vec<u8>".into(),
+        Type::I32 => "i32".into(),
+        Type::I64 => "i64".into(),
+        Type::U32 => "u32".into(),
+        Type::U64 => "u64".into(),
+        Type::F32 => "f32".into(),
+        Type::F64 => "f64".into(),
         Type::List(t) => format!("Vec<{}>", rust_type(t)),
         Type::Map(t) => format!("::std::collections::BTreeMap<String, {}>", rust_type(t)),
         Type::Named(n) => n.clone(),
-        _ => "()".into(),
     }
 }
 
-fn variant_ident(name: &str) -> String {
-    name.to_upper_camel_case()
-}
-
-/// `#[serde(rename = …)]` when `rename_all = "snake_case"` would not give
-/// back `name`.
-fn rename(out: &mut String, indent: &str, name: &str) {
-    if variant_ident(name).to_snake_case() != name {
-        let _ = writeln!(out, "{indent}#[serde(rename = {name:?})]");
+/// Doc comments for an item, with examples.
+fn docs(out: &mut String, indent: &str, attrs: &korek_ir::Attrs, extra: &[String]) {
+    let mut text = doc_text(attrs).unwrap_or_default();
+    for e in extra {
+        if !text.is_empty() {
+            text.push_str("\n\n");
+        }
+        text.push_str(e);
     }
-}
-
-fn type_def(out: &mut String, t: &TypeDef) {
-    doc_lines(out, "", "/// ", t.doc.as_deref());
-    match &t.kind {
-        TypeKind::Enum(e) => enum_def(out, &t.name, e),
-        TypeKind::Struct(s) => struct_def(out, &t.name, s),
-        TypeKind::Union(u) => union_def(out, &t.name, u),
-        _ => {}
-    }
-}
-
-const SERDE: &str = "::serde::Serialize, ::serde::Deserialize";
-
-fn enum_def(out: &mut String, name: &str, e: &EnumDef) {
-    let _ = writeln!(
-        out,
-        "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, {SERDE})]\n\
-         #[serde(rename_all = \"snake_case\")]\npub enum {name} {{"
-    );
-    for v in &e.variants {
-        doc_lines(out, "    ", "/// ", v.doc.as_deref());
-        rename(out, "    ", &v.name);
-        let _ = writeln!(out, "    {},", variant_ident(&v.name));
-    }
-    out.push_str("}\n");
-}
-
-fn struct_def(out: &mut String, name: &str, s: &StructDef) {
-    let _ = writeln!(
-        out,
-        "#[derive(Debug, Clone, PartialEq, {SERDE})]\npub struct {name} {{"
-    );
-    for f in &s.fields {
-        doc_lines(out, "    ", "/// ", f.doc.as_deref());
-        constraint_doc(out, "    ", f.doc.is_some(), &f.constraints);
-        let ty = rust_type(&f.ty);
-        if f.optional {
-            out.push_str("    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n");
-            let _ = writeln!(out, "    pub {}: Option<{ty}>,", ident(&f.name));
-        } else {
-            let _ = writeln!(out, "    pub {}: {ty},", ident(&f.name));
+    if !attrs.examples.is_empty() && !attrs.secret {
+        if !text.is_empty() {
+            text.push_str("\n\n");
+        }
+        text.push_str("Examples:\n");
+        for e in &attrs.examples {
+            let _ = write!(text, "\n- `{e}`");
         }
     }
-    out.push_str("}\n");
-}
-
-fn union_def(out: &mut String, name: &str, u: &UnionDef) {
-    let _ = writeln!(out, "#[derive(Debug, Clone, PartialEq, {SERDE})]");
-    match &u.tag {
-        Some(tag) => {
-            let _ = writeln!(out, "#[serde(tag = {tag:?}, rename_all = \"snake_case\")]");
-        }
-        None => out.push_str("#[serde(untagged)]\n"),
-    }
-    let _ = writeln!(out, "pub enum {name} {{");
-    for v in &u.variants {
-        doc_lines(out, "    ", "/// ", v.doc.as_deref());
-        if u.tag.is_some() {
-            rename(out, "    ", &v.name);
-        }
-        let _ = writeln!(out, "    {}({}),", variant_ident(&v.name), rust_type(&v.ty));
-    }
-    out.push_str("}\n");
-}
-
-/// Documents constraints as a doc paragraph (Rust has no native form).
-fn constraint_doc(out: &mut String, indent: &str, after_doc: bool, c: &Constraints) {
-    let list = constraint_list(c);
-    if list.is_empty() {
-        return;
-    }
-    if after_doc {
-        let _ = writeln!(out, "{indent}///");
-    }
-    let _ = writeln!(out, "{indent}/// Constraints: {}.", list.join(", "));
-}
-
-fn constraint_list(c: &Constraints) -> Vec<String> {
-    let mut v = Vec::new();
-    if let Some(n) = c.min {
-        v.push(format!("min {}", format_number(n)));
-    }
-    if let Some(n) = c.max {
-        v.push(format!("max {}", format_number(n)));
-    }
-    if let Some(n) = c.min_len {
-        v.push(format!("min_len {n}"));
-    }
-    if let Some(n) = c.max_len {
-        v.push(format!("max_len {n}"));
-    }
-    if let Some(p) = &c.pattern {
-        v.push(format!("pattern `{p}`"));
-    }
-    v
-}
-
-fn constraint_consts(c: &Constraints) -> String {
-    let mut v = Vec::new();
-    if let Some(n) = c.min {
-        v.push(format!("super::Constraint::Min({n:?})"));
-    }
-    if let Some(n) = c.max {
-        v.push(format!("super::Constraint::Max({n:?})"));
-    }
-    if let Some(n) = c.min_len {
-        v.push(format!("super::Constraint::MinLen({n})"));
-    }
-    if let Some(n) = c.max_len {
-        v.push(format!("super::Constraint::MaxLen({n})"));
-    }
-    if let Some(p) = &c.pattern {
-        v.push(format!("super::Constraint::Pattern({p:?})"));
-    }
-    format!("&[{}]", v.join(", "))
-}
-
-fn key_group(out: &mut String, schema: &Schema, g: &KeyGroup, hooks: &[&dyn Hook]) {
-    doc_lines(out, "", "/// ", g.doc.as_deref());
-    let _ = writeln!(
+    comment(
         out,
-        "pub mod {} {{\n    #[allow(unused_imports)]\n    use super::*;\n",
-        ident(&g.ident())
+        indent,
+        "/// ",
+        (!text.is_empty()).then_some(text.as_str()),
     );
-    for k in &g.keys {
-        doc_lines(out, "    ", "/// ", k.doc.as_deref());
-        let ty = rust_type(&k.ty);
-        let (default, default_json) = match &k.default {
-            Some(j) => {
-                let v = resolve(schema, &k.ty, j, &Constraints::default());
-                let lit = v.map_or_else(|_| "unreachable!()".into(), |v| literal(schema, &v));
-                (
-                    format!("Some(|| {lit})"),
-                    format!("Some({:?})", j.to_string()),
-                )
+    if let Some(d) = &attrs.deprecated {
+        let _ = writeln!(out, "{indent}#[deprecated(note = {d:?})]");
+    }
+}
+
+fn rules_doc(v: &korek_ir::Validate) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+    for r in &v.rules {
+        tags.push(format!("`{}`", r.kind.name()));
+    }
+    if tags.is_empty() {
+        Vec::new()
+    } else {
+        vec![format!("Validated: {}.", tags.join(", "))]
+    }
+}
+
+struct Gen<'a> {
+    schema: &'a Schema,
+    out: String,
+    warnings: Vec<Diagnostic>,
+}
+
+/// Generates the Rust file (plus hook files) and warnings for rules it
+/// cannot express.
+pub fn generate(
+    schema: &Schema,
+    opts: &Options,
+    hooks: &[&dyn Hook],
+) -> (Vec<File>, Vec<Diagnostic>) {
+    let mut g = Gen {
+        schema,
+        out: String::with_capacity(32 * 1024),
+        warnings: Vec::new(),
+    };
+    let _ = writeln!(g.out, "// {GENERATED}");
+    for t in &schema.types {
+        g.out.push('\n');
+        g.type_def(t);
+        for h in hooks {
+            h.after(Item::Type(t), &mut g.out);
+        }
+    }
+    if !schema.keys.is_empty() {
+        g.keys(hooks);
+    }
+    for h in hooks {
+        h.footer(schema, &mut g.out);
+    }
+    let mut files = vec![File::new(&opts.file, g.out)];
+    for h in hooks {
+        files.extend(h.files(schema));
+    }
+    (files, g.warnings)
+}
+
+impl Gen<'_> {
+    fn type_def(&mut self, t: &TypeDef) {
+        docs(&mut self.out, "", &t.attrs, &[]);
+        match &t.kind {
+            TypeKind::Enum(e) => {
+                let _ = writeln!(
+                    self.out,
+                    "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, {SERDE})]\npub enum {} {{",
+                    t.name
+                );
+                for v in &e.variants {
+                    docs(&mut self.out, "    ", &v.attrs, &[]);
+                    let _ = writeln!(
+                        self.out,
+                        "    #[serde(rename = {:?})]\n    {},",
+                        v.name,
+                        pascal(&v.name)
+                    );
+                }
+                self.out.push_str("}\n");
             }
-            None => ("None".into(), "None".into()),
+            TypeKind::Struct(s) => self.struct_def(t, &s.fields),
+            TypeKind::Union(u) => {
+                let _ = writeln!(self.out, "#[derive(Debug, Clone, PartialEq, {SERDE})]");
+                match &u.tag {
+                    Some(tag) => {
+                        let _ = writeln!(self.out, "#[serde(tag = {tag:?})]");
+                    }
+                    None => self.out.push_str("#[serde(untagged)]\n"),
+                }
+                let _ = writeln!(self.out, "pub enum {} {{", t.name);
+                for v in &u.variants {
+                    docs(&mut self.out, "    ", &v.attrs, &[]);
+                    if u.tag.is_some() {
+                        let _ = writeln!(self.out, "    #[serde(rename = {:?})]", v.name);
+                    }
+                    let _ = writeln!(self.out, "    {}({}),", pascal(&v.name), rust_type(&v.ty));
+                }
+                self.out.push_str("}\n");
+            }
+        }
+        self.validate_impl(t);
+    }
+
+    /// The field's Rust type: `Option<T>` when optional without a default.
+    fn field_type(f: &Field) -> String {
+        let ty = rust_type(&f.ty);
+        if f.optional && f.default.is_none() {
+            format!("Option<{ty}>")
+        } else {
+            ty
+        }
+    }
+
+    fn struct_def(&mut self, t: &TypeDef, fields: &[Field]) {
+        let _ = writeln!(
+            self.out,
+            "#[derive(Debug, Clone, PartialEq, {SERDE})]\npub struct {} {{",
+            t.name
+        );
+        for f in fields {
+            docs(&mut self.out, "    ", &f.attrs, &rules_doc(&f.validate));
+            let opt = f.optional && f.default.is_none();
+            let mut serde = Vec::new();
+            if f.ty == Type::Bytes {
+                serde.push(format!(
+                    "with = \"{RT}::base64{}\"",
+                    if opt { "::option" } else { "" }
+                ));
+            }
+            if opt {
+                serde.push("default".into());
+                serde.push("skip_serializing_if = \"Option::is_none\"".into());
+            }
+            if f.default.is_some() {
+                serde.push(format!("default = \"{}::default_{}\"", t.name, f.name));
+            }
+            if !serde.is_empty() {
+                let _ = writeln!(self.out, "    #[serde({})]", serde.join(", "));
+            }
+            let _ = writeln!(
+                self.out,
+                "    pub {}: {},",
+                rust_ident(&f.name),
+                Self::field_type(f)
+            );
+        }
+        self.out.push_str("}\n");
+        let defaults: Vec<&Field> = fields.iter().filter(|f| f.default.is_some()).collect();
+        if !defaults.is_empty() {
+            let _ = writeln!(self.out, "\nimpl {} {{", t.name);
+            for f in &defaults {
+                let lit = f
+                    .default
+                    .as_ref()
+                    .map_or_else(String::new, |d| self.literal_json(&f.ty, d));
+                let _ = writeln!(
+                    self.out,
+                    "    pub fn default_{}() -> {} {{\n        {lit}\n    }}",
+                    f.name,
+                    rust_type(&f.ty)
+                );
+            }
+            self.out.push_str("}\n");
+        }
+        if fields.iter().all(|f| f.optional || f.default.is_some()) {
+            let _ = writeln!(
+                self.out,
+                "\nimpl Default for {} {{\n    fn default() -> Self {{\n        Self {{",
+                t.name
+            );
+            for f in fields {
+                let v = if f.default.is_some() {
+                    format!("Self::default_{}()", f.name)
+                } else {
+                    "None".into()
+                };
+                let _ = writeln!(self.out, "            {}: {v},", rust_ident(&f.name));
+            }
+            self.out.push_str("        }\n    }\n}\n");
+        }
+    }
+
+    fn validate_impl(&mut self, t: &TypeDef) {
+        let mut body = String::new();
+        validate::type_body(self.schema, t, &mut body, &mut self.warnings);
+        let unused = if body.trim().is_empty() {
+            "        let _ = (path, errors);\n"
+        } else {
+            ""
         };
         let _ = writeln!(
-            out,
-            "    pub const {}: super::Key<{ty}> = super::Key {{\n        \
-             group: {:?},\n        name: {:?},\n        doc: {:?},\n        \
-             default: {default},\n        default_json: {default_json},\n        \
-             constraints: {},\n    }};",
-            k.ident().to_shouty_snake_case(),
+            self.out,
+            "\n#[allow(clippy::all, clippy::pedantic)]\nimpl {RT}::Validate for {} {{\n    fn validate_at(&self, path: &{RT}::Path<'_>, errors: &mut {RT}::ValidationErrors) {{\n{unused}{body}    }}\n}}",
+            t.name
+        );
+    }
+
+    fn literal_json(&self, ty: &Type, j: &korek_ir::Json) -> String {
+        resolve(self.schema, ty, j)
+            .map_or_else(|_| "unreachable!()".into(), |v| literal(self.schema, &v))
+    }
+
+    fn keys(&mut self, hooks: &[&dyn Hook]) {
+        let s = self.schema;
+        self.out.push_str("\n/// Every key, as a typed const named after its full dotted name.\n#[allow(clippy::all, clippy::pedantic)]\npub mod keys {\n    #[allow(unused_imports)]\n    use super::*;\n");
+        let mut all = Vec::new();
+        for g in &s.keys {
+            let _ = writeln!(self.out, "\n    // `{}` keys.", g.name);
+            comment(&mut self.out, "    ", "// ", doc_text(&g.attrs).as_deref());
+            for k in &g.keys {
+                self.key(g, k);
+                all.push(format!("{:?}", format!("{}.{}", g.name, k.name)));
+                for h in hooks {
+                    h.after(Item::Key(g, k), &mut self.out);
+                }
+            }
+            for h in hooks {
+                h.after(Item::KeyGroup(g), &mut self.out);
+            }
+        }
+        let _ = writeln!(
+            self.out,
+            "\n    /// Every key's full name.\n    pub const ALL: &[&str] = &[{}];\n}}",
+            all.join(", ")
+        );
+    }
+
+    fn key(&mut self, g: &KeyGroup, k: &Key) {
+        let ty = rust_type(&k.ty);
+        let ident = shouty(&g.key_ident(k));
+        let (default, default_json) = match &k.default {
+            Some(j) => (
+                format!("Some(|| {})", self.literal_json(&k.ty, j)),
+                format!("Some({:?})", j.to_string()),
+            ),
+            None => ("None".into(), "None".into()),
+        };
+        let mut check = String::new();
+        validate::value_checks(
+            self.schema,
+            &k.ty,
+            &k.validate,
+            "v",
+            &mut check,
+            2,
+            &mut self.warnings,
+        );
+        let check_fn = format!("check_{}", g.key_ident(k));
+        let unused = if check.trim().is_empty() {
+            "        let _ = (v, path, errors);\n"
+        } else {
+            ""
+        };
+        let _ = writeln!(
+            self.out,
+            "\n    fn {check_fn}(v: &{ty}, path: &{RT}::Path<'_>, errors: &mut {RT}::ValidationErrors) {{\n{unused}{check}    }}\n"
+        );
+        docs(&mut self.out, "    ", &k.attrs, &[]);
+        let rules: Vec<String> = k
+            .validate
+            .rules
+            .iter()
+            .map(|r| {
+                let operand = validate::operand_json(&r.kind);
+                format!(
+                    "{RT}::RuleInfo {{ name: {:?}, operand: {operand:?} }}",
+                    r.kind.name()
+                )
+            })
+            .collect();
+        let opt = |o: &Option<String>| {
+            o.as_ref()
+                .map_or_else(|| "None".to_owned(), |s| format!("Some({s:?})"))
+        };
+        let _ = writeln!(
+            self.out,
+            "    pub const {ident}: {RT}::Key<{ty}> = {RT}::Key {{\n        group: {:?},\n        name: {:?},\n        path: {:?},\n        doc: {:?},\n        default: {default},\n        default_json: {default_json},\n        secret: {},\n        deprecated: {},\n        unit: {},\n        rules: &[{}],\n        check: {check_fn},\n    }};",
             g.name,
             k.name,
-            k.doc.as_deref().unwrap_or(""),
-            constraint_consts(&k.constraints),
+            format!("{}.{}", g.name, k.name),
+            doc_text(&k.attrs).unwrap_or_default(),
+            k.attrs.secret,
+            opt(&k.attrs.deprecated),
+            opt(&k.attrs.unit),
+            rules.join(", "),
         );
-        for h in hooks {
-            h.after(Item::Key(g, k), out);
-        }
-        out.push('\n');
     }
-    let names: Vec<String> = g.keys.iter().map(|k| format!("{:?}", k.name)).collect();
-    let _ = writeln!(
-        out,
-        "    /// Every key in this block.\n    pub const NAMES: &[&str] = &[{}];",
-        names.join(", ")
-    );
-    for h in hooks {
-        h.after(Item::KeyGroup(g), out);
-    }
-    out.push_str("}\n");
 }
 
 /// A Rust expression building `v`.
@@ -347,15 +381,17 @@ pub fn literal(schema: &Schema, v: &Value) -> String {
     let lit = |v: &Value| literal(schema, v);
     match v {
         Value::Bool(b) => b.to_string(),
-        Value::String(s) => format!("String::from({s:?})"),
-        Value::I64(i) => i.to_string(),
-        Value::U64(u) => u.to_string(),
-        Value::F64(f) => format!("{f:?}"),
-        Value::Bytes(b) => format!("vec!{b:?}"),
-        Value::List(l) => {
-            let items: Vec<String> = l.iter().map(lit).collect();
-            format!("vec![{}]", items.join(", "))
+        Value::String(s) | Value::Timestamp(s) | Value::Duration(s) => {
+            format!("String::from({s:?})")
         }
+        Value::Bytes(b) => format!(
+            "vec!{:?}",
+            korek_runtime::base64::decode(b).unwrap_or_default()
+        ),
+        Value::Int(i) => i.to_string(),
+        Value::Uint(u) => u.to_string(),
+        Value::Float(f) => format!("{f:?}"),
+        Value::List(l) => format!("vec![{}]", l.iter().map(lit).collect::<Vec<_>>().join(", ")),
         Value::Map(m) if m.is_empty() => "::std::collections::BTreeMap::new()".into(),
         Value::Map(m) => {
             let items: Vec<String> = m
@@ -364,28 +400,30 @@ pub fn literal(schema: &Schema, v: &Value) -> String {
                 .collect();
             format!("::std::collections::BTreeMap::from([{}])", items.join(", "))
         }
-        Value::Enum { ty, variant } => format!("{ty}::{}", variant_ident(variant)),
+        Value::Enum { ty, variant } => format!("{ty}::{}", pascal(variant)),
         Value::Struct { ty, fields } => {
-            let optional = |name: &str| match schema.get(ty).map(|t| &t.kind) {
-                Some(TypeKind::Struct(s)) => s.fields.iter().any(|f| f.name == name && f.optional),
-                _ => false,
+            let def = |name: &str| match schema.get(ty).map(|t| &t.kind) {
+                Some(TypeKind::Struct(s)) => s.fields.iter().find(|f| f.name == name),
+                _ => None,
             };
             let fs: Vec<String> = fields
                 .iter()
                 .map(|(k, v)| {
+                    let f = def(k);
+                    let has_default = f.is_some_and(|f| f.default.is_some());
+                    let optional = f.is_some_and(|f| f.optional) && !has_default;
                     let v = match v {
+                        None if has_default => format!("{ty}::default_{k}()"),
                         None => "None".into(),
-                        Some(v) if optional(k) => format!("Some({})", lit(v)),
+                        Some(v) if optional => format!("Some({})", lit(v)),
                         Some(v) => lit(v),
                     };
-                    format!("{}: {v}", ident(k))
+                    format!("{}: {v}", rust_ident(k))
                 })
                 .collect();
             format!("{ty} {{ {} }}", fs.join(", "))
         }
-        Value::Union { ty, variant, value } => {
-            format!("{ty}::{}({})", variant_ident(variant), lit(value))
-        }
+        Value::Union { ty, variant, value } => format!("{ty}::{}({})", pascal(variant), lit(value)),
         _ => "unreachable!()".into(),
     }
 }
