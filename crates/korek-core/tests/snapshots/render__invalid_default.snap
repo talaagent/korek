@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "keys \"s\" {\n  key \"a\" \"u64\" default=-1\n}"
+---
+korek::invalid_default (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_default)
+
+  × invalid default (u64): expected u64, found a number
+   ╭─[test.kdl:2:17]
+ 1 │ keys "s" {
+ 2 │   key "a" "u64" default=-1
+   ·                 ─────┬────
+   ·                      ╰── this default
+ 3 │ }
+   ╰────

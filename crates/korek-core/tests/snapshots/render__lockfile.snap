@@ -1,0 +1,13 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: render(&f)
+---
+korek::lockfile (https://github.com/talaagent/korek/blob/main/docs/errors.md#lockfile)
+
+  × malformed lockfile entry: expected `item "name" <number>`
+   ╭─[korek.lock:1:1]
+ 1 │ ╭─▶ struct "A" {
+ 2 │ │     item "x"
+ 3 │ ├─▶ }
+   · ╰──── here
+   ╰────

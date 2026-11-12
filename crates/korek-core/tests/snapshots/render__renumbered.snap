@@ -1,0 +1,15 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\" id=7\n}"
+---
+korek::renumbered (https://github.com/talaagent/korek/blob/main/docs/errors.md#renumbered)
+
+  × `x` is pinned to id=7 but korek.lock records 1
+   ╭─[test.kdl:2:20]
+ 1 │ struct A {
+ 2 │   field x "string" id=7
+   ·                    ──┬─
+   ·                      ╰── differs from the lockfile
+ 3 │ }
+   ╰────
+  help: numbers never change silently: edit korek.lock to renumber on purpose

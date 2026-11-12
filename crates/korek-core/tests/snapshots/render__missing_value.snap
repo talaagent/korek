@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x\n}"
+---
+korek::missing_value (https://github.com/talaagent/korek/blob/main/docs/errors.md#missing_value)
+
+  × `field` needs a type
+   ╭─[test.kdl:2:3]
+ 1 │ struct A {
+ 2 │   field x
+   ·   ───┬───
+   ·      ╰── add a type, e.g. "string"
+ 3 │ }
+   ╰────

@@ -46,7 +46,9 @@ nix develop -c sh -c 'bun install && bun test && bun run typecheck'
 - IR changes are protocol changes: keep structs `#[non_exhaustive]`, add fields with serde defaults,
   bump `korek_plugin::PROTOCOL_VERSION` on breaking ones.
 - Every diagnostic has a stable `korek::<code>` and a span when there is a source location; add a test
-  in `crates/korek-core/tests/load.rs` for new errors.
+  in `crates/korek-core/tests/load.rs` for new errors. New codes also get an insta snapshot of their
+  rendering: `crates/korek-core/tests/render.rs` (loader codes) or `crates/korek-cli/tests/render.rs`
+  (generator/CLI codes); accept with `INSTA_UPDATE=always` (or `cargo insta review`) and read the `.snap`.
 - Generated code must pass the downstream tools: Rust compiles (fixture), proto passes `buf lint` and
   `buf build`, Zod passes `bun test` and `tsc`.
 - No "kdl" in crate, binary or module names; KDL is only the input format.

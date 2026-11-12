@@ -1,0 +1,13 @@
+---
+source: crates/korek-cli/tests/render.rs
+expression: "korek(tmp.path(), &[\"gen\", \"--check\", \"--ts\", \"out\", \"schema\"])"
+---
+korek::stale_output (https://github.com/talaagent/korek/blob/main/docs/errors.md#stale_output)
+
+  × out/types.ts is out of date
+  help: run `korek gen` without --check
+
+korek::stale_output (https://github.com/talaagent/korek/blob/main/docs/errors.md#stale_output)
+
+  × schema/korek.lock is out of date
+  help: run `korek gen` without --check

@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field a \"bool\" { validate { gte 1 } }\n}"
+---
+korek::invalid_rule (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_rule)
+
+  × `gte` does not apply to `bool`
+   ╭─[test.kdl:2:31]
+ 1 │ struct A {
+ 2 │   field a "bool" { validate { gte 1 } }
+   ·                               ───┬──
+   ·                                  ╰── this rule
+ 3 │ }
+   ╰────

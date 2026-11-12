@@ -1,0 +1,13 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {}\nenum A { variant x }"
+---
+korek::duplicate_name (https://github.com/talaagent/korek/blob/main/docs/errors.md#duplicate_name)
+
+  × duplicate type `A`
+   ╭─[test.kdl:2:6]
+ 1 │ struct A {}
+ 2 │ enum A { variant x }
+   ·      ┬
+   ·      ╰── declared again here
+   ╰────

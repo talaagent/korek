@@ -1,0 +1,13 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A { field b \"B\" }\nstruct B { field a \"list<A>\" }"
+---
+korek::cycle (https://github.com/talaagent/korek/blob/main/docs/errors.md#cycle)
+
+  × recursive types are not supported yet: A → B → A
+   ╭─[test.kdl:1:8]
+ 1 │ struct A { field b "B" }
+   ·        ┬
+   ·        ╰── part of the cycle
+ 2 │ struct B { field a "list<A>" }
+   ╰────
