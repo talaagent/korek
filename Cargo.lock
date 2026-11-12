@@ -275,6 +275,7 @@ name = "korek"
 version = "0.1.0"
 dependencies = [
  "korek-core",
+ "korek-gen-docs",
  "korek-gen-jsonschema",
  "korek-gen-proto",
  "korek-gen-rust",
@@ -297,6 +298,7 @@ dependencies = [
  "insta",
  "korek",
  "korek-core",
+ "korek-gen-docs",
  "korek-gen-jsonschema",
  "korek-gen-proto",
  "korek-gen-rust",
@@ -341,6 +343,17 @@ name = "korek-gen-common"
 version = "0.1.0"
 dependencies = [
  "korek-ir",
+ "serde_json",
+]
+
+[[package]]
+name = "korek-gen-docs"
+version = "0.1.0"
+dependencies = [
+ "korek-core",
+ "korek-gen-common",
+ "korek-ir",
+ "korek-plugin",
  "serde_json",
 ]
 

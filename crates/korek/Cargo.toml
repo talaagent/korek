@@ -15,11 +15,12 @@ workspace = true
 [features]
 default = ["generators"]
 # The first-party generator libraries, callable in-process.
-generators = ["dep:korek-gen-rust", "dep:korek-gen-proto", "dep:korek-gen-zod", "dep:korek-gen-ts", "dep:korek-gen-jsonschema"]
+generators = ["dep:korek-gen-rust", "dep:korek-gen-proto", "dep:korek-gen-zod", "dep:korek-gen-ts", "dep:korek-gen-jsonschema", "dep:korek-gen-docs"]
 miette = ["korek-core/miette"]
 
 [dependencies]
 korek-core.workspace = true
+korek-gen-docs = { workspace = true, optional = true }
 korek-gen-jsonschema = { workspace = true, optional = true }
 korek-gen-proto = { workspace = true, optional = true }
 korek-gen-rust = { workspace = true, optional = true }
