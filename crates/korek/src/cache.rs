@@ -19,9 +19,9 @@ use crate::Output;
 const FORMAT: &str = "korek-cache-1";
 
 /// Hashes everything a run reads, except the per-output parts.
-pub(crate) fn inputs(
+pub(crate) fn inputs<'a>(
     loader: &Loader,
-    files: &[korek_core::SourceFile],
+    files: impl IntoIterator<Item = (&'a str, &'a str)>,
     lock: Option<&str>,
 ) -> blake3::Hash {
     let mut h = blake3::Hasher::new();
@@ -35,9 +35,9 @@ pub(crate) fn inputs(
     for e in loader.extension_names() {
         field(&mut h, e.as_bytes());
     }
-    for f in files {
-        field(&mut h, f.path.as_bytes());
-        field(&mut h, f.contents.as_bytes());
+    for (path, contents) in files {
+        field(&mut h, path.as_bytes());
+        field(&mut h, contents.as_bytes());
     }
     field(&mut h, lock.unwrap_or("\0none").as_bytes());
     h.finalize()
@@ -123,7 +123,5 @@ pub(crate) fn store(dir: &Path, key: &str, entry: &Entry) {
 
 /// What [`Read`] holds, for building sources on a full hit.
 pub(crate) fn sources(read: &Read) -> korek_core::Sources {
-    let mut files = read.files.clone();
-    files.extend(read.lock.clone());
-    korek_core::Sources { files }
+    korek_core::Sources::new(read.files.iter().chain(&read.lock).cloned())
 }

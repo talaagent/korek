@@ -372,7 +372,9 @@ impl Driver {
         let inputs = self.cache.as_ref().map(|_| {
             cache::inputs(
                 &self.loader,
-                &read.files,
+                read.files
+                    .iter()
+                    .map(|f| (f.path.as_str(), f.contents.as_str())),
                 read.lock.as_ref().map(|l| l.contents.as_str()),
             )
         });
@@ -494,9 +496,9 @@ impl Driver {
         let lock = match &loaded {
             Some(l) => l.lock_path.clone().map(|p| (p, l.lock.render())),
             None => sources
-                .files
+                .files()
                 .get(n_files)
-                .map(|f| (read.lock_path.clone(), f.contents.clone())),
+                .map(|f| (read.lock_path.clone(), f.text().to_owned())),
         };
         if let Some((p, text)) = &lock {
             files.push(("lock".into(), p.clone(), text.clone()));
@@ -583,7 +585,13 @@ impl Driver {
         fresh: Vec<(usize, core::ops::Range<usize>, Vec<Diagnostic>)>,
         how: &[Result<Result<PathBuf, Builtin>, Error>],
     ) {
-        let inputs = cache::inputs(&self.loader, &l.sources.files[..n_files], lock);
+        let inputs = cache::inputs(
+            &self.loader,
+            l.sources.files()[..n_files]
+                .iter()
+                .map(|f| (f.name(), f.text())),
+            lock,
+        );
         for (i, range, diagnostics) in fresh {
             let out = &self.outputs[i];
             let entry = cache::Entry {

@@ -168,18 +168,12 @@ impl<'a> Node<'a> {
     }
 
     pub fn children(&self) -> Vec<Node<'a>> {
-        self.inner
-            .children()
-            .map(|d| {
-                d.nodes()
-                    .iter()
-                    .map(|n| Node {
-                        inner: n,
-                        file: self.file,
-                    })
-                    .collect()
+        kdl_nodes::children(self.inner)
+            .map(|n| Node {
+                inner: n,
+                file: self.file,
             })
-            .unwrap_or_default()
+            .collect()
     }
 
     /// A generic JSON form: `{"name", "args", "props", "children"}`, with

@@ -1,14 +1,14 @@
 //! Reading schema files: a directory of `.kdl` files as one ordered set of
-//! sources, and line/column lookup for spans.
-//!
-//! Kept small and internal on purpose: it moves to the `kdl-load` crate of
-//! talaagent/kdl-serde once that lands.
+//! sources, and line/column lookup for spans. Listing and the source map
+//! come from `kdl-load` and `kdl-span` (talaagent/kdl-serde).
 
+use alloc::sync::Arc;
 use std::path::{Path, PathBuf};
 
 use korek_ir::Span;
 
-/// A source file of a schema.
+/// A source file of a schema, as read (the input to
+/// [`Loader::load_sources`](crate::Loader::load_sources)).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceFile {
     /// Path relative to the schema directory (or as given).
@@ -19,45 +19,58 @@ pub struct SourceFile {
 /// The files a schema was loaded from, indexed by [`Span::file`].
 #[derive(Debug, Clone, Default)]
 pub struct Sources {
-    pub files: Vec<SourceFile>,
+    map: kdl_span::SourceMap,
 }
 
 impl Sources {
+    /// Sources of `files`, in order.
+    pub fn new(files: impl IntoIterator<Item = SourceFile>) -> Self {
+        let mut s = Self::default();
+        for f in files {
+            s.push(f);
+        }
+        s
+    }
+
+    /// Adds a file and returns its index (its spans' [`Span::file`]).
+    pub fn push(&mut self, file: SourceFile) -> u32 {
+        let id = self.map.add(file.path, file.contents);
+        u32::try_from(id.index()).unwrap_or(u32::MAX)
+    }
+
+    /// The files, in order (`name()` is the path, `text()` the contents).
+    pub fn files(&self) -> &[Arc<kdl_span::SourceFile>] {
+        self.map.files()
+    }
+
+    /// The underlying `kdl-span` source map.
+    pub fn map(&self) -> &kdl_span::SourceMap {
+        &self.map
+    }
+
     /// The file a span points into.
-    pub fn file(&self, span: Span) -> Option<&SourceFile> {
-        self.files.get(span.file as usize)
+    pub fn file(&self, span: Span) -> Option<&Arc<kdl_span::SourceFile>> {
+        self.map.files().get(span.file as usize)
     }
 
     /// 1-based line and column (in characters) of a span's start.
     pub fn line_col(&self, span: Span) -> Option<(usize, usize)> {
-        let text = &self.file(span)?.contents;
-        let upto = text.get(..span.offset as usize)?;
-        let line = upto.matches('\n').count() + 1;
-        let col = upto.rsplit('\n').next().map_or(0, |l| l.chars().count()) + 1;
-        Some((line, col))
+        let file = self.file(span)?;
+        let offset = span.offset as usize;
+        (offset <= file.text().len()).then(|| file.line_col(offset))
     }
 }
 
-/// Every `.kdl` file under `dir`, recursively, sorted by path.
+/// Every `.kdl` file under `dir`, recursively, sorted by path, with paths
+/// relative to `dir`.
 ///
 /// # Errors
 /// The path and error of the first file or directory that cannot be read.
 pub fn read_dir(dir: &Path) -> Result<Vec<SourceFile>, (PathBuf, std::io::Error)> {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), (PathBuf, std::io::Error)> {
-        let entries = std::fs::read_dir(dir).map_err(|e| (dir.to_path_buf(), e))?;
-        for entry in entries {
-            let path = entry.map_err(|e| (dir.to_path_buf(), e))?.path();
-            if path.is_dir() {
-                walk(&path, out)?;
-            } else if path.extension().is_some_and(|e| e == "kdl") {
-                out.push(path);
-            }
-        }
-        Ok(())
-    }
-    let mut paths = Vec::new();
-    walk(dir, &mut paths)?;
-    paths.sort();
+    let paths = kdl_load::kdl_files(dir, true).map_err(|e| match e {
+        kdl_load::Error::Io { path, source } => (path, source),
+        other => (dir.to_path_buf(), std::io::Error::other(other.to_string())),
+    })?;
     paths
         .into_iter()
         .map(|p| {

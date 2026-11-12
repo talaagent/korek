@@ -1,6 +1,7 @@
 //! Source → IR. Reads the grammar; numbers, defaults and examples are
 //! finished by later passes from the side table [`Aux`].
 
+use alloc::sync::Arc;
 use std::collections::HashMap;
 
 use kdl::KdlDocument;
@@ -11,8 +12,8 @@ use korek_ir::{
     UnionDef, UnionVariant, Validate,
 };
 
-use crate::ext::{Arg, Extension, ItemKind, Literal, Node, span_of};
-use crate::source::SourceFile;
+use crate::ext::{Arg, Extension, ItemKind, Literal, Node};
+use crate::source::Sources;
 use crate::types::parse_type;
 
 /// What later passes need that the IR does not keep, keyed by item span.
@@ -99,54 +100,55 @@ impl<'e> Parser<'e> {
         }
     }
 
-    /// Parses and lowers every file. KDL parsing, most of the work, runs
-    /// on one thread per file; lowering is in file order.
-    pub fn files(&mut self, files: &[SourceFile]) {
-        let docs: Vec<Result<KdlDocument, kdl::KdlError>> = if files.len() > 1 {
+    /// Parses and lowers every file. KDL parsing (`kdl-load`), most of the
+    /// work, runs on one thread per file; lowering is in file order.
+    pub fn files(&mut self, sources: &Sources) {
+        let parse = |f: &Arc<kdl_span::SourceFile>| {
+            kdl_load::load_str(f.name(), Arc::clone(f.text_arc())).map(|l| l.into_parts().0)
+        };
+        let files = sources.files();
+        let docs: Vec<Result<KdlDocument, kdl_load::Error>> = if files.len() > 1 {
             std::thread::scope(|s| {
-                let handles: Vec<_> = files
-                    .iter()
-                    .map(|f| s.spawn(|| KdlDocument::parse_v2(&f.contents)))
-                    .collect();
+                let handles: Vec<_> = files.iter().map(|f| s.spawn(|| parse(f))).collect();
                 handles
                     .into_iter()
                     .zip(files)
-                    .map(|(h, f)| {
-                        h.join()
-                            .unwrap_or_else(|_| KdlDocument::parse_v2(&f.contents))
-                    })
+                    .map(|(h, f)| h.join().unwrap_or_else(|_| parse(f)))
                     .collect()
             })
         } else {
-            files
-                .iter()
-                .map(|f| KdlDocument::parse_v2(&f.contents))
-                .collect()
+            files.iter().map(parse).collect()
         };
         for (file, doc) in files.iter().zip(docs) {
-            self.file(file, doc);
+            self.file(file.name(), doc);
         }
     }
 
-    fn file(&mut self, file: &SourceFile, doc: Result<KdlDocument, kdl::KdlError>) {
+    fn file(&mut self, path: &str, doc: Result<KdlDocument, kdl_load::Error>) {
         #[allow(clippy::cast_possible_truncation)]
         let id = self.schema.files.len() as u32;
-        self.schema.files.push(file.path.clone());
+        self.schema.files.push(path.to_owned());
         let doc = match doc {
             Ok(d) => d,
-            Err(e) => {
-                for d in e.diagnostics {
-                    let mut diag = Diagnostic::error(
-                        codes::SYNTAX,
-                        d.message.unwrap_or_else(|| "invalid KDL".into()),
-                    )
-                    .at(
-                        span_of!(id, d.span),
-                        d.label.unwrap_or_else(|| "here".into()),
-                    );
-                    diag.help = d.help;
+            Err(kdl_load::Error::Parse(e)) => {
+                for p in e.problems() {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let span = Span {
+                        file: id,
+                        offset: p.label.span.offset as u32,
+                        len: p.label.span.len as u32,
+                    };
+                    let label = p.label.message.as_deref().unwrap_or("here");
+                    let mut diag =
+                        Diagnostic::error(codes::SYNTAX, p.message.clone()).at(span, label);
+                    diag.help.clone_from(&p.help);
                     self.diags.push(diag);
                 }
+                return;
+            }
+            Err(e) => {
+                self.diags
+                    .push(Diagnostic::error(codes::SYNTAX, e.to_string()));
                 return;
             }
         };

@@ -32,7 +32,10 @@ bpaf = { version = "0.9", features = ["derive"] }
 divan = "0.1"
 heck = "0.5"
 insta = "1"
-kdl = { version = "6", default-features = false, features = ["span"] }
+kdl = { version = "6.7", default-features = false, features = ["span"] }
+kdl-load = { git = "https://github.com/talaagent/kdl-serde", rev = "8bda293", default-features = false }
+kdl-nodes = { git = "https://github.com/talaagent/kdl-serde", rev = "8bda293" }
+kdl-span = { git = "https://github.com/talaagent/kdl-serde", rev = "8bda293" }
 miette = "7"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

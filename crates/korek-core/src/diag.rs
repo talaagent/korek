@@ -82,7 +82,7 @@ pub fn diagnostic_json(d: &Diagnostic, sources: &Sources) -> serde_json::Value {
 
 /// `{file, line, col}` for a span, each `null` when unknown.
 fn location_json(span: Option<korek_ir::Span>, sources: &Sources) -> serde_json::Value {
-    let file = span.and_then(|s| sources.file(s)).map(|f| f.path.as_str());
+    let file = span.and_then(|s| sources.file(s)).map(|f| f.name());
     let lc = span.and_then(|s| sources.line_col(s));
     serde_json::json!({
         "file": file,
@@ -111,7 +111,7 @@ mod render {
     use core::fmt;
 
     use korek_ir::{Diagnostic, Severity};
-    use miette::{LabeledSpan, NamedSource, SourceSpan};
+    use miette::{LabeledSpan, SourceSpan};
 
     use crate::source::Sources;
 
@@ -121,7 +121,7 @@ mod render {
     pub struct Rendered {
         diag: Diagnostic,
         url: Option<String>,
-        src: Option<NamedSource<Arc<str>>>,
+        src: Option<Arc<kdl_span::SourceFile>>,
     }
 
     impl Rendered {
@@ -133,7 +133,7 @@ mod render {
                     .starts_with("korek::")
                     .then(|| korek_ir::codes::url(&diag.code)),
                 diag: diag.clone(),
-                src: src.map(|f| NamedSource::new(&f.path, Arc::<str>::from(f.contents.as_str()))),
+                src: src.map(Arc::clone),
             }
         }
     }
@@ -172,7 +172,7 @@ mod render {
         }
 
         fn source_code(&self) -> Option<&dyn miette::SourceCode> {
-            self.src.as_ref().map(|s| s as &dyn miette::SourceCode)
+            self.src.as_deref().map(|s| s as &dyn miette::SourceCode)
         }
 
         fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {

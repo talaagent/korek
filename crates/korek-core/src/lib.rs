@@ -163,18 +163,16 @@ impl Loader {
         lock: Option<SourceFile>,
     ) -> Result<Loaded, Failure> {
         let exts: Vec<&dyn Extension> = self.exts.iter().map(|e| &**e as &dyn Extension).collect();
+        let mut sources = Sources::new(files);
         let mut p = parse::Parser::new(&exts);
-        p.files(&files);
-        let mut sources = Sources { files };
+        p.files(&sources);
         if !p.diags.is_empty() {
             return Err(Failure::new(p.diags, sources));
         }
         let old = match lock {
             Some(l) => {
-                #[allow(clippy::cast_possible_truncation)]
-                let id = sources.files.len() as u32;
-                let parsed = Lock::parse(&l, id);
-                sources.files.push(l);
+                let parsed = Lock::parse(&l, sources.files().len().try_into().unwrap_or(u32::MAX));
+                sources.push(l);
                 match parsed {
                     Ok(lock) => lock,
                     Err(d) => return Err(Failure::new(d, sources)),

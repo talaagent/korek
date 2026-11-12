@@ -14,10 +14,13 @@ workspace = true
 
 [features]
 # miette::Diagnostic rendering of diagnostics.
-miette = ["dep:miette"]
+miette = ["dep:miette", "kdl-span/miette"]
 
 [dependencies]
 kdl.workspace = true
+kdl-load.workspace = true
+kdl-nodes.workspace = true
+kdl-span.workspace = true
 korek-ir.workspace = true
 korek-runtime.workspace = true
 miette = { workspace = true, optional = true }
