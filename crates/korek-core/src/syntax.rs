@@ -1,11 +1,10 @@
 //! The adapter between korek and the KDL parser: the only module that
-//! names the `kdl` crate's tree types. Files are parsed with kdl-load
-//! (talaagent/kdl-serde), child nodes walked with kdl-nodes, and kdl-span
-//! carries parse problems; everything past this module sees [`Node`],
-//! [`Literal`] and korek [`Span`]s. When kdl-serde moves to its own tree,
-//! only this module changes.
+//! names the KDL tree types. Files are parsed into kdl-tree documents with
+//! kdl-load (talaagent/kdl-serde), child nodes walked with kdl-nodes, and
+//! kdl-span carries parse problems; everything past this module sees
+//! [`Node`], [`Literal`] and korek [`Span`]s.
 
-use kdl::{KdlDocument, KdlEntry, KdlNode, KdlValue};
+use kdl_load::{Entry, Value};
 
 use korek_ir::Span;
 
@@ -15,7 +14,7 @@ use alloc::sync::Arc;
 use kdl_span::SourceFile;
 
 /// A parsed file.
-pub(crate) struct Document(KdlDocument);
+pub(crate) struct Document(kdl_load::Document<'static>);
 
 impl Document {
     /// The top-level nodes; `file` is the file's index in the sources.
@@ -35,7 +34,7 @@ pub(crate) struct Problem {
 /// Parses one file (`file` is its index in the sources).
 pub(crate) fn parse(file: u32, name: &str, text: Arc<str>) -> Result<Document, Vec<Problem>> {
     match kdl_load::load_str(name, text) {
-        Ok(loaded) => Ok(Document(loaded.into_parts().0)),
+        Ok(loaded) => Ok(Document(loaded.into_tree().0)),
         Err(kdl_load::Error::Parse(e)) => Err(e
             .problems()
             .iter()
@@ -86,35 +85,21 @@ fn span(file: u32, offset: usize, len: usize) -> Span {
     }
 }
 
-fn literal(v: &KdlValue) -> Literal {
+fn literal(v: &Value<'_>) -> Literal {
     match v {
-        KdlValue::String(s) => Literal::String(s.clone()),
-        KdlValue::Integer(i) => Literal::Int(*i),
-        KdlValue::Float(f) => Literal::Float(*f),
-        KdlValue::Bool(b) => Literal::Bool(*b),
-        KdlValue::Null => Literal::Null,
+        Value::String(s) => Literal::String(s.to_string()),
+        Value::Integer(i) => Literal::Int(*i),
+        Value::Float(f) => Literal::Float(*f),
+        Value::Bool(b) => Literal::Bool(*b),
+        Value::Null => Literal::Null,
     }
 }
 
 /// A read-only view of a schema node, handed to extensions.
 #[derive(Debug, Clone, Copy)]
 pub struct Node<'a> {
-    pub(crate) inner: &'a KdlNode,
+    pub(crate) inner: &'a kdl_load::Node<'static>,
     pub(crate) file: u32,
-}
-
-/// A korek span from a kdl span (whose type comes from miette, which
-/// korek-core does not depend on by default).
-macro_rules! span_of {
-    ($file:expr, $s:expr) => {{
-        let s = $s;
-        #[allow(clippy::cast_possible_truncation)]
-        korek_ir::Span {
-            file: $file,
-            offset: s.offset() as u32,
-            len: s.len() as u32,
-        }
-    }};
 }
 
 impl<'a> Node<'a> {
@@ -123,36 +108,32 @@ impl<'a> Node<'a> {
     }
 
     pub fn span(&self) -> Span {
-        span_of!(self.file, self.inner.span())
+        let s = self.inner.span();
+        span(self.file, s.offset, s.len)
     }
 
     /// The span of the node's name.
     pub fn name_span(&self) -> Span {
-        span_of!(self.file, self.inner.name().span())
+        let s = self.inner.name().span();
+        span(self.file, s.offset, s.len)
     }
 
-    fn arg_of(&self, e: &KdlEntry) -> Arg {
+    fn arg_of(&self, e: &Entry<'_>) -> Arg {
         Arg {
             value: literal(e.value()),
-            span: span_of!(self.file, e.span()),
+            span: span(self.file, e.span().offset, e.span().len),
         }
     }
 
     /// Positional arguments.
     pub fn args(&self) -> Vec<Arg> {
-        self.inner
-            .entries()
-            .iter()
-            .filter(|e| e.name().is_none())
-            .map(|e| self.arg_of(e))
-            .collect()
+        self.inner.args().map(|e| self.arg_of(e)).collect()
     }
 
     /// Properties in source order (`name=value`).
     pub fn props(&self) -> Vec<(&'a str, Arg)> {
         self.inner
-            .entries()
-            .iter()
+            .props()
             .filter_map(|e| e.name().map(|n| (n.value(), self.arg_of(e))))
             .collect()
     }

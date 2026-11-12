@@ -8,10 +8,10 @@ Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zo
   helpers in `impls.rs`), diagnostic codes (`codes.rs`, mirrored by `docs/errors.md`), typed values.
 - `crates/korek-core`: parse (`parse.rs`), validation (`validate.rs`), rule evaluation for defaults and
   examples (`check.rs`), lockfile numbering (`lock.rs`), extensions (`ext.rs`), sources (`source.rs`: `Sources`
-  wraps kdl-span's `SourceMap`; listing and KDL parsing via kdl-load, kdl-nodes for child walking; all from
-  talaagent/kdl-serde by git rev in `[workspace.dependencies]`), diagnostics (`diag.rs`; miette only behind `miette`).
-  `syntax.rs` is the only module that names the `kdl` crate's tree types (parsing, `Node`, literals): when
-  kdl-serde moves to its own tree, only it changes. Keep it that way.
+  wraps kdl-span's `SourceMap`; listing and KDL parsing into kdl-tree documents via kdl-load, kdl-nodes for
+  child walking; all from talaagent/kdl-serde by git rev in `[workspace.dependencies]`, with `kdl-compat` off so
+  the `kdl` crate is not in the tree), diagnostics (`diag.rs`; miette only behind `miette`). `syntax.rs` is the
+  only module that names the KDL tree types (parsing, `Node`, literals). Keep it that way.
 - `crates/korek-plugin`: `run`, `Encoding`, `Hook`; depends on korek-ir only.
 - `crates/korek-gen-common`: shared generator helpers. `crates/korek-gen-{rust,proto,zod,ts,jsonschema,docs}`:
   `generate(&schema, &opts, hooks)` and `plugin(&req)`. Zod builds on the TS crate.

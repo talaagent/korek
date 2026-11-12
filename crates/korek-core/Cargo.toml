@@ -17,7 +17,6 @@ workspace = true
 miette = ["dep:miette", "kdl-span/miette"]
 
 [dependencies]
-kdl.workspace = true
 kdl-load.workspace = true
 kdl-nodes.workspace = true
 kdl-span.workspace = true

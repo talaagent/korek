@@ -9,7 +9,7 @@ korek::rule_unsupported (https://github.com/talaagent/korek/blob/main/docs/error
    ╭─[a.kdl:3:33]
  2 │ struct A {
  3 │   field x "string" { validate { emoji } }
-   ·                                 ───┬──
-   ·                                    ╰── not enforced by this target
+   ·                                 ──┬──
+   ·                                   ╰── not enforced by this target
  4 │ }
    ╰────

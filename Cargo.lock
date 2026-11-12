@@ -45,12 +45,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
-name = "autocfg"
-version = "1.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
-
-[[package]]
 name = "backtrace"
 version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -310,43 +304,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
-name = "kdl"
-version = "6.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "082ddf81b2acd76fe04412655d17befedfff1837db772f8e74c38050d25ed670"
-dependencies = [
- "miette",
- "num-traits",
- "winnow",
-]
-
-[[package]]
 name = "kdl-load"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=8bda293#8bda29352821a9670ee86e6b9fe65cea11cc37dd"
+source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
- "kdl",
  "kdl-span",
+ "kdl-tree",
  "thiserror",
 ]
 
 [[package]]
 name = "kdl-nodes"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=8bda293#8bda29352821a9670ee86e6b9fe65cea11cc37dd"
+source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
- "kdl",
  "kdl-span",
+ "kdl-tree",
  "thiserror",
 ]
 
 [[package]]
 name = "kdl-span"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=8bda293#8bda29352821a9670ee86e6b9fe65cea11cc37dd"
+source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
- "kdl",
+ "kdl-tree",
  "miette",
+]
+
+[[package]]
+name = "kdl-tree"
+version = "0.1.0"
+source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -400,7 +391,6 @@ name = "korek-core"
 version = "0.1.0"
 dependencies = [
  "insta",
- "kdl",
  "kdl-load",
  "kdl-nodes",
  "kdl-span",
@@ -601,15 +591,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
-]
-
-[[package]]
-name = "num-traits"
-version = "0.2.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
-dependencies = [
- "autocfg",
 ]
 
 [[package]]
@@ -901,15 +882,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
-]
-
-[[package]]
-name = "winnow"
-version = "0.7.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
-dependencies = [
- "memchr",
 ]
 
 [[package]]

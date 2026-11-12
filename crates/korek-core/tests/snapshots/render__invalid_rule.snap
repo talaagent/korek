@@ -8,7 +8,7 @@ korek::invalid_rule (https://github.com/talaagent/korek/blob/main/docs/errors.md
    ╭─[test.kdl:2:31]
  1 │ struct A {
  2 │   field a "bool" { validate { gte 1 } }
-   ·                               ───┬──
-   ·                                  ╰── this rule
+   ·                               ──┬──
+   ·                                 ╰── this rule
  3 │ }
    ╰────

@@ -4,18 +4,10 @@ expression: "struct A {\n  field x \"string\"\n"
 ---
 korek::syntax (https://github.com/talaagent/korek/blob/main/docs/errors.md#syntax)
 
-  × No closing '}' for child block
+  × unterminated children block, expected `}`
    ╭─[test.kdl:1:10]
  1 │ struct A {
    ·          ┬
-   ·          ╰── not closed
+   ·          ╰── starts here
  2 │   field x "string"
-   ╰────
-korek::syntax (https://github.com/talaagent/korek/blob/main/docs/errors.md#syntax)
-
-  × Closing '}' was not found after nodes
-   ╭─[test.kdl:1:11]
- 1 │ ╭─▶ struct A {
- 2 │ ├─▶   field x "string"
-   · ╰──── not closed
    ╰────
