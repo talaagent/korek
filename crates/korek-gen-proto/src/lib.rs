@@ -78,6 +78,7 @@ breaking:
     - FILE
 ";
 
+#[allow(clippy::struct_excessive_bools)]
 struct Gen<'a> {
     schema: &'a Schema,
     index: TypeIndex<'a>,
@@ -89,6 +90,7 @@ struct Gen<'a> {
     /// Well-known types used (for imports).
     timestamp: bool,
     duration: bool,
+    json: bool,
     warnings: Vec<Diagnostic>,
 }
 
@@ -108,6 +110,7 @@ pub fn generate(
         validates: false,
         timestamp: false,
         duration: false,
+        json: false,
         warnings: Vec::new(),
     };
     g.body();
@@ -121,6 +124,9 @@ pub fn generate(
     }
     if g.duration {
         imports.push("google/protobuf/duration.proto");
+    }
+    if g.json {
+        imports.push("google/protobuf/struct.proto");
     }
     if g.timestamp {
         imports.push("google/protobuf/timestamp.proto");
@@ -159,6 +165,7 @@ fn scalar(ty: &Type) -> Option<&'static str> {
         Type::Bytes => "bytes",
         Type::Timestamp => "google.protobuf.Timestamp",
         Type::Duration => "google.protobuf.Duration",
+        Type::Json => "google.protobuf.Value",
         _ => return None,
     })
 }
@@ -257,7 +264,7 @@ impl Gen<'_> {
         let kind = self.kind_of(ty).cloned();
         let mut r = rules::field(ty, kind.as_ref(), v, &mut self.warnings);
         let is_message = matches!(kind, Some(TypeKind::Struct(_) | TypeKind::Union(_)))
-            || matches!(ty, Type::Timestamp | Type::Duration);
+            || matches!(ty, Type::Timestamp | Type::Duration | Type::Json);
         if is_message && !optional && !v.has(|k| matches!(k, RuleKind::Required)) {
             r.set("required", "true".into());
         }
@@ -272,6 +279,7 @@ impl Gen<'_> {
         match ty {
             Type::Timestamp => self.timestamp = true,
             Type::Duration => self.duration = true,
+            Type::Json => self.json = true,
             Type::List(t) | Type::Map(t) => self.note_wkt(t),
             _ => {}
         }
@@ -304,10 +312,11 @@ impl Gen<'_> {
             Type::List(t) => format!("repeated {}", element(t)),
             Type::Map(t) => format!("map<string, {}>", element(t)),
             other => {
-                let is_message = matches!(
-                    self.kind_of(other),
-                    Some(TypeKind::Struct(_) | TypeKind::Union(_))
-                ) || matches!(other, Type::Timestamp | Type::Duration);
+                let is_message =
+                    matches!(
+                        self.kind_of(other),
+                        Some(TypeKind::Struct(_) | TypeKind::Union(_))
+                    ) || matches!(other, Type::Timestamp | Type::Duration | Type::Json);
                 let base = element(other);
                 if presence && !is_message {
                     format!("optional {base}")

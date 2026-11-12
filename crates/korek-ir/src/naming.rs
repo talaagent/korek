@@ -32,6 +32,7 @@ fn proto_base(ty: &Type) -> String {
         Type::Bytes => "Bytes".into(),
         Type::Timestamp => "Timestamp".into(),
         Type::Duration => "Duration".into(),
+        Type::Json => "Json".into(),
         Type::Named(n) => n.clone(),
         Type::List(_) | Type::Map(_) => proto_wrapper(ty),
     }

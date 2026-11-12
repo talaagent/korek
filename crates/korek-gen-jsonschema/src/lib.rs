@@ -110,6 +110,7 @@ fn base(ty: &Type) -> Map<String, Json> {
         Type::F32 | Type::F64 => json!({"type": "number"}),
         Type::Timestamp => json!({"type": "string", "format": "date-time"}),
         Type::Duration => json!({"type": "string", "pattern": "^-?\\d+(\\.\\d+)?s$"}),
+        Type::Json => json!({}),
         Type::List(_) => json!({"type": "array"}),
         Type::Map(_) => json!({"type": "object"}),
         Type::Named(n) => json!({"$ref": format!("#/$defs/{n}")}),

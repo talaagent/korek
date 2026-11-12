@@ -234,6 +234,15 @@
           "type": "string",
           "pattern": "^\\+[1-9]\\d{6,14}$",
           "description": "Since 1.2."
+        },
+        "extra": {
+          "description": "Free-form metadata from the importer.",
+          "examples": [
+            {
+              "source": "vcard",
+              "rev": 3
+            }
+          ]
         }
       },
       "required": [
@@ -306,6 +315,12 @@
           "type": "string",
           "minLength": 20,
           "writeOnly": true
+        },
+        "claude.metadata": {
+          "description": "Sent with each request.",
+          "default": {
+            "team": "core"
+          }
         }
       }
     }

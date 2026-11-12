@@ -269,7 +269,7 @@ pub enum Idempotency {
 
 /// A type. JSON forms: integers as numbers, `bytes` base64, `timestamp`
 /// RFC 3339, `duration` a decimal number of seconds with an `s` suffix
-/// (`"1.5s"`), as in the Protobuf JSON mapping.
+/// (`"1.5s"`), as in the Protobuf JSON mapping; `json` any JSON value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Type {
@@ -284,6 +284,9 @@ pub enum Type {
     F64,
     Timestamp,
     Duration,
+    /// Any JSON value. Added in protocol 2 without a bump: schemas that
+    /// do not use it serialize as before.
+    Json,
     List(Box<Type>),
     /// `map<string,T>`.
     Map(Box<Type>),

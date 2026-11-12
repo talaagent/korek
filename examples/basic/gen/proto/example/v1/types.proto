@@ -5,6 +5,7 @@ package example.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 message SearchRequest {
@@ -83,6 +84,8 @@ message Contact {
   google.protobuf.Timestamp created = 7 [(buf.validate.field) = {timestamp: {lt_now: true}, required: true}];
   // Since 1.2.
   optional string phone = 8 [(buf.validate.field) = {cel: [{id: "format.e164", message: "must be a valid e164", expression: "this.matches('^\\\\+[1-9]\\\\d{6,14}$')"}]}];
+  // Free-form metadata from the importer.
+  google.protobuf.Value extra = 9;
 }
 
 // Per-session settings.
@@ -112,6 +115,10 @@ message ClaudeKeys {
   // Model override; unset means the account default.
   optional string model = 2 [(buf.validate.field) = {string: {pattern: "^[a-z0-9.-]+$"}}];
   optional string api_key = 3 [(buf.validate.field) = {string: {min_len: 20}}];
+  // Sent with each request.
+  //
+  // Default: {"team":"core"}
+  google.protobuf.Value metadata = 4;
 }
 
 // A `list<string>` where Protobuf cannot nest one directly.

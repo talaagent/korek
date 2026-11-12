@@ -73,6 +73,22 @@ fn bytes_are_base64() {
 }
 
 #[test]
+fn json_fields_hold_any_value() {
+    let mut c = contact();
+    assert_eq!(c.extra, None);
+    let extra = json!({"source": "vcard", "rev": 3, "tags": [null, true, 1.5]});
+    c.extra = Some(extra.clone());
+    let v = serde_json::to_value(&c).unwrap();
+    assert_eq!(v["extra"], extra);
+    assert_eq!(serde_json::from_value::<Contact>(v).unwrap(), c);
+    assert_eq!(c.validate(), Ok(()));
+    assert_eq!(
+        keys::CLAUDE_METADATA.default_value(),
+        Some(json!({"team": "core"}))
+    );
+}
+
+#[test]
 fn validate_reports_every_failure_with_paths() {
     assert_eq!(contact().validate(), Ok(()));
     let mut c = contact();
@@ -122,5 +138,5 @@ fn keys_carry_defaults_and_metadata() {
         serde_json::to_value(keys::CLAUDE_MCP_SERVERS.default_value().unwrap()).unwrap(),
         json
     );
-    assert_eq!(keys::ALL.len(), 9);
+    assert_eq!(keys::ALL.len(), 10);
 }

@@ -13,10 +13,13 @@ publish.workspace = true
 workspace = true
 
 [features]
-default = ["regex"]
+default = ["regex", "json"]
 # `pattern` rules and the emoji format.
 regex = ["dep:regex"]
+# `json` fields (`serde_json::Value`).
+json = ["dep:serde_json"]
 
 [dependencies]
 regex = { workspace = true, optional = true }
 serde.workspace = true
+serde_json = { workspace = true, optional = true }

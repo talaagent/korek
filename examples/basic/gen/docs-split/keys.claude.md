@@ -9,6 +9,7 @@
 | [`claude.mcp_servers`](keys.claude.md#key.claude.mcp_servers) | `map<string,`[`McpServer`](types.md#type.McpServer)`>` | `{}` |  |
 | [`claude.model`](keys.claude.md#key.claude.model) | `string` |  | Model override; unset means the account default. |
 | [`claude.api_key`](keys.claude.md#key.claude.api_key) | `string` |  | **Secret.** |
+| [`claude.metadata`](keys.claude.md#key.claude.metadata) | `json` | `{"team":"core"}` | Sent with each request. |
 
 <a id="key.claude.mcp_servers"></a>
 
@@ -44,3 +45,12 @@ Model override; unset means the account default.
 - Type: `string`
 - Rules: At least 20 characters.
 - **Secret**: never printed or shown with its value.
+
+<a id="key.claude.metadata"></a>
+
+## `claude.metadata`
+
+Sent with each request.
+
+- Type: `json`
+- Default: `{"team":"core"}`

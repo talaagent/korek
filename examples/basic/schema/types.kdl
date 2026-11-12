@@ -69,4 +69,8 @@ struct Contact {
   }
   field created "timestamp" { validate { lt_now } }
   field phone "string" optional=#true { validate { e164 }; since "1.2" }
+  field extra "json" optional=#true {
+    doc "Free-form metadata from the importer."
+    example #"{"source": "vcard", "rev": 3}"#
+  }
 }

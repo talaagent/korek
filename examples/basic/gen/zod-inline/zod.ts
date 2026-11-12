@@ -115,6 +115,11 @@ export interface Contact {
    * @format e164
    */
   phone?: string;
+  /**
+   * Free-form metadata from the importer.
+   * @example {"source":"vcard","rev":3}
+   */
+  extra?: unknown;
 }
 
 /** Every key, by its full dotted name. */
@@ -164,6 +169,11 @@ export interface Keys {
    * @secret
    */
   "claude.api_key": string;
+  /**
+   * Sent with each request.
+   * @default {"team":"core"}
+   */
+  "claude.metadata": unknown;
 }
 
 export const SearchRequestSchema = z.object({
@@ -187,6 +197,11 @@ export const ContactSchema = z.object({
   created: z.iso.datetime({ offset: true }).refine((v) => Date.parse(v) / 1000 < Date.now() / 1000),
   /** Since 1.2. */
   phone: z.e164().optional(),
+  /**
+   * Free-form metadata from the importer.
+   * @example {"source":"vcard","rev":3}
+   */
+  extra: z.json().optional(),
 }) satisfies z.ZodType<Contact>;
 
 export const SearchResponseSchema = z.object({
@@ -297,5 +312,11 @@ export const keys: { [K in keyof Keys]-?: Key<Keys[K]> } = {
     schema: z.string().refine((v) => [...v].length >= 20),
     doc: "",
     secret: true,
+  },
+  /** Sent with each request. */
+  "claude.metadata": {
+    schema: z.json(),
+    default: {"team":"core"},
+    doc: "Sent with each request.",
   },
 };

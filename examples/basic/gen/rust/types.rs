@@ -270,6 +270,13 @@ pub struct Contact {
     /// Validated: `e164`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phone: Option<String>,
+    /// Free-form metadata from the importer.
+    ///
+    /// Examples:
+    ///
+    /// - `{"source":"vcard","rev":3}`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<::korek_runtime::serde_json::Value>,
 }
 
 #[allow(clippy::all, clippy::pedantic)]
@@ -555,6 +562,25 @@ pub mod keys {
         check: check_claude_api_key,
     };
 
+    fn check_claude_metadata(v: &::korek_runtime::serde_json::Value, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
+        let _ = (v, path, errors);
+    }
+
+    /// Sent with each request.
+    pub const CLAUDE_METADATA: ::korek_runtime::Key<::korek_runtime::serde_json::Value> = ::korek_runtime::Key {
+        group: "claude",
+        name: "metadata",
+        path: "claude.metadata",
+        doc: "Sent with each request.",
+        default: Some(|| ::korek_runtime::serde_json::from_str::<::korek_runtime::serde_json::Value>("{\"team\":\"core\"}").expect("valid JSON")),
+        default_json: Some("{\"team\":\"core\"}"),
+        secret: false,
+        deprecated: None,
+        unit: None,
+        rules: &[],
+        check: check_claude_metadata,
+    };
+
     /// Every key's full name.
-    pub const ALL: &[&str] = &["session.steer.enabled", "session.backend", "session.timeout", "session.temperature", "session.turn_limit", "session.max_turns", "claude.mcp_servers", "claude.model", "claude.api_key"];
+    pub const ALL: &[&str] = &["session.steer.enabled", "session.backend", "session.timeout", "session.temperature", "session.turn_limit", "session.max_turns", "claude.mcp_servers", "claude.model", "claude.api_key", "claude.metadata"];
 }

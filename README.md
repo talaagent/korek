@@ -113,8 +113,11 @@ service ContactsService {
 ```
 
 - **Types**: `bool`, `string`, `bytes`, `i32`, `i64`, `u32`, `u64`, `f32`,
-  `f64`, `timestamp`, `duration`, `list<T>`, `map<string,T>`, named types.
-  Fields can be `optional=#true` and have a `default=`. Recursive types are
+  `f64`, `timestamp`, `duration`, `json` (any JSON value: Rust
+  `serde_json::Value`, TS `unknown`, Zod `z.json()`, Protobuf
+  `google.protobuf.Value`), `list<T>`, `map<string,T>`, named types.
+  Fields can be `optional=#true` and have a `default=` (JSON text for
+  lists, maps, structs and `json`). Recursive types are
   not supported yet.
 - **Validation**: a `validate { … }` block; see [VALIDATION.md](VALIDATION.md)
   for every rule and what each target supports.
@@ -301,8 +304,9 @@ output through `korek-testkit` to check it agrees with the shared vectors.
 
 Not in v1: `korek fmt`, a docs/markdown generator, schema imports across
 packages, breaking-change detection against a git ref, an LSP, Python and Go
-generators, recursive types, defining korek's own IR in a korek schema
-(self-hosting; [schema/korek](schema/korek) is the start).
+generators, recursive types, generating korek's own IR from its korek schema
+([schema/korek](schema/korek) describes it and is checked against it; see
+"Self-hosting" in CLAUDE.md).
 
 ## Development
 

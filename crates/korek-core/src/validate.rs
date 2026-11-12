@@ -360,6 +360,7 @@ impl Validator<'_> {
         let is_msg = matches!(named, Some(TypeKind::Struct(_) | TypeKind::Union(_)));
         let ok = match kind {
             R::Cel { .. } => true,
+            _ if *ty == Type::Json => false,
             R::Const { .. } | R::In { .. } | R::NotIn { .. } => {
                 !is_msg
                     && !ty.is_collection()
@@ -678,11 +679,11 @@ impl Validator<'_> {
 }
 
 /// A default or example as JSON: native values for scalars and enums, a
-/// JSON string for lists, maps, structs and tagged unions (an untagged
+/// JSON string for lists, maps, structs, tagged unions and `json` (an untagged
 /// union also takes a native value, or a string that is not JSON as itself).
 fn literal_json(ty: &Type, schema: &TypeIndex<'_>, lit: &Literal) -> Result<Json, String> {
     let compound = match ty {
-        Type::List(_) | Type::Map(_) => Some(false),
+        Type::List(_) | Type::Map(_) | Type::Json => Some(false),
         Type::Named(n) => match schema.get(n).map(|t| &t.kind) {
             Some(TypeKind::Struct(_)) => Some(false),
             Some(TypeKind::Union(_)) => Some(true),

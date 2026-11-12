@@ -1,8 +1,9 @@
 //! The runtime for korek's generated Rust: [`Validate`], validation errors
 //! with paths, string format checks ([`format`]), the base64 serde adapter
 //! for `bytes` ([`base64`]), `timestamp`/`duration` parsing and the
-//! `Duration` codecs for integers with a time unit ([`time`]), and
-//! composable serde codecs for nested fields ([`with`]).
+//! `Duration` codecs for integers with a time unit ([`time`]),
+//! composable serde codecs for nested fields ([`with`]), and
+//! `serde_json` for `json` fields.
 //!
 //! Validation does not allocate on the success path: paths are built on the
 //! stack ([`Path`]) and only formatted when a rule fails.
@@ -18,6 +19,8 @@ use core::fmt;
 
 #[cfg(feature = "regex")]
 pub use regex;
+#[cfg(feature = "json")]
+pub use serde_json;
 
 /// A position in a value being validated, as a stack-allocated linked list.
 #[derive(Debug, Clone, Copy)]

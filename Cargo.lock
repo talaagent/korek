@@ -419,7 +419,9 @@ version = "0.1.0"
 dependencies = [
  "korek-core",
  "korek-gen-rust",
+ "korek-ir",
  "korek-runtime",
+ "korek-testkit",
  "serde",
  "serde_json",
 ]
@@ -530,6 +532,7 @@ version = "0.1.0"
 dependencies = [
  "regex",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
