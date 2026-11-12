@@ -25,6 +25,25 @@ code before the performance work) with the same benchmark.
 | `korek gen`, subprocess plugins | 396 ms | 196 ms | 2.0× |
 | `korek gen`, cache warm | — | 3.0 ms | 130× vs builtin |
 
+## After kdl-load (kdl-serde 8bda293)
+
+Sources, listing and parsing moved to kdl-load/kdl-span/kdl-nodes, which
+needs `kdl` 6.7 (was 6.5.0; one copy, now 6.7.1). The host was even busier
+(load average 40–75), so each configuration was run twice, interleaved, on
+`load_and_validate`; fastest / median of 30 samples:
+
+| Configuration | 18 files | one file |
+|---|---:|---:|
+| before (fe19af7, kdl 6.5.0) | 65–82 / 137–167 ms | 239–247 / 312 ms |
+| before, kdl 6.7.1 only | 67–90 / 143–165 ms | 338–341 / 431–445 ms |
+| after (kdl-load, kdl 6.7.1) | 86–91 / 125–171 ms | 314–316 / 418–425 ms |
+
+The kdl-load switch itself is neutral (same parallel per-file parsing,
+spans unchanged). The one-file slowdown, ~35% fastest-to-fastest, comes
+from the `kdl` 6.5 → 6.7 parser and also hits kdl-serde; the 18-file load
+is within the noise. `full_gen` and the generators were not touched; their
+runs here differed by up to 2× between identical builds.
+
 What changed:
 
 - **KDL files are parsed in parallel** (one thread per file); lowering stays
