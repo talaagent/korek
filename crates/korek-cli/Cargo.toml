@@ -58,6 +58,7 @@ serde_json.workspace = true
 
 [dev-dependencies]
 divan.workspace = true
+insta.workspace = true
 korek = { workspace = true }
 korek-core.workspace = true
 korek-ir.workspace = true

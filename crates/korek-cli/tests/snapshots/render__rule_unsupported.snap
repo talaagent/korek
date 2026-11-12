@@ -1,0 +1,15 @@
+---
+source: crates/korek-cli/tests/render.rs
+expression: "korek(tmp.path(), &[\"gen\", \"--proto\", \"out\", \"schema\"])"
+---
+korek::rule_unsupported (https://github.com/talaagent/korek/blob/main/docs/errors.md#rule_unsupported)
+
+  ⚠ korek-gen-proto cannot express `emoji`: protovalidate has no rule for this
+  │ format
+   ╭─[a.kdl:3:33]
+ 2 │ struct A {
+ 3 │   field x "string" { validate { emoji } }
+   ·                                 ───┬──
+   ·                                    ╰── not enforced by this target
+ 4 │ }
+   ╰────

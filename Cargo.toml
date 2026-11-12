@@ -29,6 +29,7 @@ anyhow = "1"
 bpaf = { version = "0.9", features = ["derive"] }
 divan = "0.1"
 heck = "0.5"
+insta = "1"
 kdl = { version = "6", default-features = false, features = ["span"] }
 miette = "7"
 regex = "1"

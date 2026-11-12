@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\" id=0\n}"
+---
+korek::invalid_id (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_id)
+
+  × `id` must be an integer from 1 to 536870911
+   ╭─[test.kdl:2:20]
+ 1 │ struct A {
+ 2 │   field x "string" id=0
+   ·                    ──┬─
+   ·                      ╰── bad id
+ 3 │ }
+   ╰────

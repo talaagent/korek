@@ -1,7 +1,9 @@
 # korek diagnostics
 
 Every diagnostic korek emits has a stable code. Codes are API: `snake_case`, never reused.
-Plugins namespace their own codes (`korek_gen_proto::…`). `korek gen --message-format json` prints them machine-readably.
+Plugins namespace their own codes (`korek_gen_proto::…`). `korek gen --message-format json` prints them machine-readably, one JSON object per line:
+`code`, `severity`, `message`, `help`, `url`, the primary location `file`, `line` and `col` (all `null`
+for errors with no source location, like I/O and plugin failures) and `labels`.
 
 ## `korek::syntax`
 

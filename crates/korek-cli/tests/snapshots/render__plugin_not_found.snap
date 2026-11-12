@@ -1,0 +1,8 @@
+---
+source: crates/korek-cli/tests/render.rs
+expression: "korek(tmp.path(), &[\"gen\", \"--no-builtin\", \"--out\", \"nosuch=out\", \"schema\"])"
+---
+korek::plugin_not_found (https://github.com/talaagent/korek/blob/main/docs/errors.md#plugin_not_found)
+
+  × no plugin `nosuch`: `korek-gen-nosuch` is not on PATH
+  help: install it, or pass --plugin nosuch=<path>

@@ -1,0 +1,7 @@
+---
+source: crates/korek-cli/tests/render.rs
+expression: "korek(tmp.path(),\n&[\"gen\", \"--out\", \"foo=out\", \"--plugin\", \"foo=./bad.sh\", \"schema\"])"
+---
+korek::plugin_protocol (https://github.com/talaagent/korek/blob/main/docs/errors.md#plugin_protocol)
+
+  × plugin `foo`: bad response: expected ident at line 1 column 2

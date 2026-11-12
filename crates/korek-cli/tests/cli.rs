@@ -125,3 +125,88 @@ fn ir_prints_the_schema() {
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["package"], "example.v1");
 }
+
+/// Every line `--message-format json` prints is a diagnostic object; errors
+/// without a source location have a `null` file, line and column.
+fn json_lines(out: &std::process::Output) -> Vec<serde_json::Value> {
+    assert!(
+        out.stderr.is_empty(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap_or_else(|e| panic!("{e}: {l}")))
+        .collect()
+}
+
+#[track_caller]
+fn unlocated(out: &std::process::Output, code: &str) {
+    assert!(!out.status.success());
+    let lines = json_lines(out);
+    let d = lines
+        .iter()
+        .find(|d| d["code"] == code)
+        .unwrap_or_else(|| panic!("no {code} in {lines:?}"));
+    for k in ["file", "line", "col"] {
+        assert!(d[k].is_null(), "{k} in {d}");
+    }
+    assert_eq!(d["severity"], "error");
+    assert_eq!(d["labels"], serde_json::json!([]));
+}
+
+#[test]
+fn json_errors_without_a_location() {
+    let tmp = tempfile::tempdir().unwrap();
+    let missing = tmp.path().join("missing");
+    let missing = missing.to_str().unwrap();
+    let j = ["--message-format", "json"];
+    unlocated(
+        &korek(&[&["check"], &j[..], &[missing]].concat()),
+        "korek::io",
+    );
+    let schema = tmp.path().join("schema");
+    copy_schema(&schema);
+    let schema = schema.to_str().unwrap();
+    let gen_args = |extra: &[&'static str]| -> Vec<String> {
+        ["gen", "--message-format", "json"]
+            .iter()
+            .chain(extra)
+            .map(|s| (*s).to_owned())
+            .chain([schema.to_owned()])
+            .collect()
+    };
+    let run = |a: Vec<String>| korek(&a.iter().map(String::as_str).collect::<Vec<_>>());
+    unlocated(
+        &run(gen_args(&["--out", "nosuch=x"])),
+        "korek::plugin_not_found",
+    );
+    unlocated(&run(gen_args(&[])), "korek::invalid_option");
+    let rust = tmp.path().join("rust");
+    let rust: &'static str = Box::leak(rust.to_str().unwrap().to_owned().into_boxed_str());
+    unlocated(
+        &run(gen_args(&["--rust", rust, "--rust_opt", "nope=1"])),
+        "korek::invalid_option",
+    );
+    // An unreadable lockfile (here a directory) has no span either.
+    let lock: &'static str = Box::leak(missing.to_owned().into_boxed_str());
+    std::fs::create_dir(lock).unwrap();
+    let out = run(gen_args(&["--rust", rust, "--lock", lock]));
+    assert!(!out.status.success());
+    for d in json_lines(&out) {
+        assert!(d["file"].is_null(), "{d}");
+    }
+    // A located error has all three.
+    std::fs::write(
+        tmp.path().join("schema/types.kdl"),
+        "struct A {\n  field b \"Nope\"\n}\n",
+    )
+    .unwrap();
+    let lines = json_lines(&run(gen_args(&["--rust", rust])));
+    let d = lines
+        .iter()
+        .find(|d| d["message"] == "unknown type `Nope`")
+        .unwrap();
+    assert_eq!(d["file"], "types.kdl");
+    assert_eq!((d["line"].as_u64(), d["col"].as_u64()), (Some(2), Some(11)));
+}

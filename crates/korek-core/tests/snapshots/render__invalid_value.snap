@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {}\nservice S {\n  rpc Get input=\"A\" output=\"A\" idempotency=\"sometimes\"\n}"
+---
+korek::invalid_value (https://github.com/talaagent/korek/blob/main/docs/errors.md#invalid_value)
+
+  × unknown idempotency `sometimes`
+   ╭─[test.kdl:3:32]
+ 2 │ service S {
+ 3 │   rpc Get input="A" output="A" idempotency="sometimes"
+   ·                                ───────────┬───────────
+   ·                                           ╰── expected no_side_effects or idempotent
+ 4 │ }
+   ╰────

@@ -1,0 +1,15 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\" { validate { emial } }\n}"
+---
+korek::unknown_rule (https://github.com/talaagent/korek/blob/main/docs/errors.md#unknown_rule)
+
+  × unknown rule `emial`
+   ╭─[test.kdl:2:33]
+ 1 │ struct A {
+ 2 │   field x "string" { validate { emial } }
+   ·                                 ──┬──
+   ·                                   ╰── not a rule
+ 3 │ }
+   ╰────
+  help: did you mean `email`?

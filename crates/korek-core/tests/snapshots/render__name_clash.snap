@@ -1,0 +1,15 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct SessionKeys {}\nkeys \"session\" {}"
+---
+korek::name_clash (https://github.com/talaagent/korek/blob/main/docs/errors.md#name_clash)
+
+  × keys block `session` generates the type `SessionKeys`, which is already
+  │ declared
+   ╭─[test.kdl:2:6]
+ 1 │ struct SessionKeys {}
+ 2 │ keys "session" {}
+   ·      ────┬────
+   ·          ╰── generates a clashing type
+   ╰────
+  help: rename the type declared at byte 7

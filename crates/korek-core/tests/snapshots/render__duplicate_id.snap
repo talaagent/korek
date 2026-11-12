@@ -1,0 +1,14 @@
+---
+source: crates/korek-core/tests/render.rs
+expression: "struct A {\n  field x \"string\" id=2\n  field y \"string\" id=2\n}"
+---
+korek::duplicate_id (https://github.com/talaagent/korek/blob/main/docs/errors.md#duplicate_id)
+
+  × id=2 is used by both `x` and `y`
+   ╭─[test.kdl:3:20]
+ 2 │   field x "string" id=2
+ 3 │   field y "string" id=2
+   ·                    ──┬─
+   ·                      ╰── duplicate
+ 4 │ }
+   ╰────
