@@ -219,7 +219,11 @@ dependencies = [
 name = "korek-gen-example"
 version = "0.1.0"
 dependencies = [
+ "korek",
+ "korek-core",
  "korek-plugin",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
