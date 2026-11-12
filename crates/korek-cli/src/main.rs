@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use bpaf::{Parser, construct, long, positional};
@@ -19,6 +19,7 @@ struct Common {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 struct GenArgs {
     builtin: Vec<(&'static str, Option<PathBuf>, Option<String>)>,
     outs: Vec<String>,
@@ -27,6 +28,8 @@ struct GenArgs {
     check: bool,
     strict: bool,
     no_builtin: bool,
+    cache_dir: Option<PathBuf>,
+    no_cache: bool,
     common: Common,
 }
 
@@ -104,6 +107,13 @@ fn parser() -> impl Parser<Cmd> {
     let no_builtin = long("no-builtin")
         .help("Always run plugins as subprocesses")
         .switch();
+    let cache_dir = long("cache-dir")
+        .help("Cache runs here (default: target/korek-cache when ./target exists)")
+        .argument::<PathBuf>("DIR")
+        .optional();
+    let no_cache = long("no-cache")
+        .help("Always load the schema and run every plugin")
+        .switch();
     let common = common_args();
     let gen_cmd = construct!(GenArgs {
         builtin,
@@ -113,6 +123,8 @@ fn parser() -> impl Parser<Cmd> {
         check,
         strict,
         no_builtin,
+        cache_dir,
+        no_cache,
         common
     })
     .map(Cmd::Gen)
@@ -179,7 +191,16 @@ fn print_error(code: &str, message: String, json: bool) {
 }
 
 fn gen_driver(a: &GenArgs) -> Result<Driver, String> {
-    let mut d = Driver::new().check(a.check).strict(a.strict);
+    let cache = if a.no_cache {
+        None
+    } else {
+        a.cache_dir.clone().or_else(|| {
+            Path::new("target")
+                .is_dir()
+                .then(|| PathBuf::from("target/korek-cache"))
+        })
+    };
+    let mut d = Driver::new().check(a.check).strict(a.strict).cache(cache);
     if !a.no_builtin {
         d = with_builtins(d);
     }

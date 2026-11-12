@@ -32,6 +32,8 @@ use korek_core::{Sources, codes};
 use korek_ir::{Diagnostic, GenerateRequest, GenerateResponse, Severity};
 use korek_plugin::{ENCODING_ENV, Encoding};
 
+mod cache;
+
 extern crate alloc;
 
 /// The first-party generators, callable in-process.
@@ -43,6 +45,14 @@ pub mod generators {
     pub use korek_gen_rust as rust;
     pub use korek_gen_ts as ts;
     pub use korek_gen_zod as zod;
+}
+
+/// The binary a resolved plugin runs (`None` for a builtin).
+fn binary(how: &Result<Result<PathBuf, Builtin>, Error>) -> Option<&Path> {
+    match how {
+        Ok(Ok(p)) => Some(p),
+        _ => None,
+    }
 }
 
 /// An in-process generator: the same request and response as a plugin.
@@ -95,6 +105,8 @@ pub struct Planned {
 pub enum Via {
     Builtin,
     Subprocess,
+    /// Skipped: its inputs and outputs are as the cache recorded.
+    Cached,
 }
 
 /// The result of a run.
@@ -164,6 +176,7 @@ pub struct Driver {
     check: bool,
     strict: bool,
     no_path_lookup: bool,
+    cache: Option<PathBuf>,
 }
 
 impl Driver {
@@ -233,6 +246,13 @@ impl Driver {
     #[must_use]
     pub fn no_path_lookup(mut self, yes: bool) -> Self {
         self.no_path_lookup = yes;
+        self
+    }
+
+    /// Caches runs under `dir` (see [`Driver::run`]); off by default.
+    #[must_use]
+    pub fn cache(mut self, dir: Option<PathBuf>) -> Self {
+        self.cache = dir;
         self
     }
 
@@ -316,14 +336,14 @@ impl Driver {
 
     /// Runs one output's plugin.
     fn generate(
-        &self,
         out: &Output,
+        how: Result<&Path, Builtin>,
         schema: &korek_ir::Schema,
     ) -> Result<(GenerateResponse, Via), Error> {
         let req =
             GenerateRequest::new(&out.plugin, schema.clone()).with_options(out.options.clone());
-        match self.resolve(&out.plugin)? {
-            Ok(path) => Self::invoke(&path, &req).map(|r| (r, Via::Subprocess)),
+        match how {
+            Ok(path) => Self::invoke(path, &req).map(|r| (r, Via::Subprocess)),
             Err(f) => Ok((
                 f(&req).unwrap_or_else(GenerateResponse::error),
                 Via::Builtin,
@@ -335,49 +355,115 @@ impl Driver {
     /// and writes the files whose content changed (or, with `check`, fails
     /// if any differ). The lockfile is written alongside.
     ///
+    /// With a [`cache`](Driver::cache), an output whose inputs hash as a
+    /// previous run's and whose files are unchanged on disk is not
+    /// regenerated; when all are, the schema is not even loaded.
+    ///
     /// # Errors
     /// Every diagnostic, from loading, plugins or `check`.
     #[allow(clippy::too_many_lines)]
     pub fn run(&self, dir: &Path) -> Result<Report, Error> {
-        let loaded = self.loader.load(dir)?;
-        let results: Vec<Result<(GenerateResponse, Via), Error>> = std::thread::scope(|s| {
-            let handles: Vec<_> = self
-                .outputs
-                .iter()
-                .map(|o| s.spawn(|| self.generate(o, &loaded.schema)))
-                .collect();
-            handles
-                .into_iter()
-                .map(|h| {
-                    h.join().unwrap_or_else(|_| {
-                        Err(Error::one(codes::PLUGIN_FAILED, "a plugin thread panicked"))
-                    })
-                })
-                .collect()
+        let read = self.loader.read(dir)?;
+        let how: Vec<Result<Result<PathBuf, Builtin>, Error>> = self
+            .outputs
+            .iter()
+            .map(|o| self.resolve(&o.plugin))
+            .collect();
+        let inputs = self.cache.as_ref().map(|_| {
+            cache::inputs(
+                &self.loader,
+                &read.files,
+                read.lock.as_ref().map(|l| l.contents.as_str()),
+            )
         });
+        let mut hits: Vec<Option<cache::Hit>> = self
+            .outputs
+            .iter()
+            .zip(&how)
+            .map(|(o, h)| {
+                let (Some(c), Some(i), Ok(_)) = (&self.cache, &inputs, h) else {
+                    return None;
+                };
+                cache::lookup(c, &cache::key(i, o, binary(h)))
+            })
+            .collect();
+        let n_files = read.files.len();
+        let (loaded, sources, mut warnings) =
+            if !self.outputs.is_empty() && hits.iter().all(Option::is_some) {
+                let warnings = hits
+                    .first()
+                    .and_then(Option::as_ref)
+                    .map(|h| h.entry.load_warnings.clone())
+                    .unwrap_or_default();
+                (None, cache::sources(&read), warnings)
+            } else {
+                let mut l = self.loader.load_sources(read.files, read.lock)?;
+                l.lock_path = Some(read.lock_path.clone());
+                let w = l.warnings.clone();
+                (Some(l), Sources::default(), w)
+            };
+        let results: Vec<Option<Result<(GenerateResponse, Via), Error>>> =
+            std::thread::scope(|s| {
+                let handles: Vec<_> = self
+                    .outputs
+                    .iter()
+                    .zip(&how)
+                    .zip(&hits)
+                    .map(|((o, h), hit)| {
+                        let schema = loaded.as_ref().map(|l| &l.schema);
+                        (hit.is_none()).then(|| {
+                            s.spawn(move || match (h, schema) {
+                                (Err(e), _) => Err(Error {
+                                    diagnostics: e.diagnostics.clone(),
+                                    sources: Sources::default(),
+                                }),
+                                (Ok(how), Some(schema)) => {
+                                    Self::generate(o, how.as_deref().map_err(|f| *f), schema)
+                                }
+                                (Ok(_), None) => Err(Error::one(codes::PLUGIN_FAILED, "no schema")),
+                            })
+                        })
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|h| {
+                        h.map(|h| {
+                            h.join().unwrap_or_else(|_| {
+                                Err(Error::one(codes::PLUGIN_FAILED, "a plugin thread panicked"))
+                            })
+                        })
+                    })
+                    .collect()
+            });
         let mut files = Vec::new();
-        let mut warnings = loaded.warnings.clone();
         let mut errors = Vec::new();
         let mut plugins = Vec::new();
-        for (out, res) in self.outputs.iter().zip(results) {
-            let (resp, via) = match res {
-                Ok(r) => r,
-                Err(e) => {
+        // Fresh outputs to record: (index, files' range, diagnostics).
+        let mut fresh = Vec::new();
+        for (i, (out, res)) in self.outputs.iter().zip(results).enumerate() {
+            let (diagnostics, start) = (errors.len(), files.len());
+            let resp = match (res, hits[i].take()) {
+                (_, Some(hit)) => {
+                    plugins.push((out.plugin.clone(), Via::Cached));
+                    self.diagnostics(hit.entry.diagnostics, &mut warnings, &mut errors);
+                    for ((path, _), content) in hit.entry.files.into_iter().zip(hit.contents) {
+                        files.push((out.plugin.clone(), path, content));
+                    }
+                    continue;
+                }
+                (Some(Ok((resp, via))), None) => {
+                    plugins.push((out.plugin.clone(), via));
+                    resp
+                }
+                (Some(Err(e)), None) => {
                     errors.extend(e.diagnostics);
                     continue;
                 }
+                (None, None) => continue,
             };
-            plugins.push((out.plugin.clone(), via));
-            for mut d in resp.diagnostics {
-                if self.strict && d.code == codes::RULE_UNSUPPORTED {
-                    d.severity = Severity::Error;
-                }
-                if d.is_error() {
-                    errors.push(d);
-                } else {
-                    warnings.push(d);
-                }
-            }
+            let ds = resp.diagnostics.clone();
+            self.diagnostics(resp.diagnostics, &mut warnings, &mut errors);
             for f in resp.files {
                 let rel = Path::new(&f.path);
                 if rel.is_absolute() || rel.components().any(|c| !matches!(c, Component::Normal(_)))
@@ -393,16 +479,27 @@ impl Driver {
                 }
                 files.push((out.plugin.clone(), out.dir.join(rel), f.content));
             }
+            if errors.len() == diagnostics {
+                fresh.push((i, start..files.len(), ds));
+            }
         }
+        let sources = loaded.as_ref().map_or(sources, |l| l.sources.clone());
         if !errors.is_empty() {
             korek_core::diag::sort(&mut errors);
             return Err(Error {
                 diagnostics: errors,
-                sources: loaded.sources,
+                sources,
             });
         }
-        if let Some(p) = &loaded.lock_path {
-            files.push(("lock".into(), p.clone(), loaded.lock.render()));
+        let lock = match &loaded {
+            Some(l) => l.lock_path.clone().map(|p| (p, l.lock.render())),
+            None => sources
+                .files
+                .get(n_files)
+                .map(|f| (read.lock_path.clone(), f.contents.clone())),
+        };
+        if let Some((p, text)) = &lock {
+            files.push(("lock".into(), p.clone(), text.clone()));
         }
         let files = files
             .into_iter()
@@ -424,8 +521,25 @@ impl Driver {
             files,
             warnings,
             plugins,
-            sources: loaded.sources,
+            sources,
         };
+        self.settle(&report)?;
+        if let (Some(dir), Some(l)) = (&self.cache, &loaded) {
+            self.remember(
+                dir,
+                l,
+                n_files,
+                lock.as_ref().map(|(_, t)| t.as_str()),
+                &report,
+                fresh,
+                &how,
+            );
+        }
+        Ok(report)
+    }
+
+    /// With `check`, fails on stale files; else writes them.
+    fn settle(&self, report: &Report) -> Result<(), Error> {
         if self.check {
             let stale: Vec<Diagnostic> = report
                 .stale()
@@ -440,19 +554,72 @@ impl Driver {
             if !stale.is_empty() {
                 return Err(Error {
                     diagnostics: stale,
-                    sources: report.sources,
+                    sources: report.sources.clone(),
                 });
             }
-            return Ok(report);
-        }
-        for f in report.stale() {
-            let io =
-                |e: std::io::Error| Error::one(codes::IO, format!("{}: {e}", f.path.display()));
-            if let Some(parent) = f.path.parent() {
-                std::fs::create_dir_all(parent).map_err(io)?;
+        } else {
+            for f in report.stale() {
+                let io =
+                    |e: std::io::Error| Error::one(codes::IO, format!("{}: {e}", f.path.display()));
+                if let Some(parent) = f.path.parent() {
+                    std::fs::create_dir_all(parent).map_err(io)?;
+                }
+                std::fs::write(&f.path, &f.content).map_err(io)?;
             }
-            std::fs::write(&f.path, &f.content).map_err(io)?;
         }
-        Ok(report)
+        Ok(())
+    }
+
+    /// Records the fresh outputs in the cache, keyed by the inputs as they
+    /// are now on disk (the lock as written).
+    #[allow(clippy::too_many_arguments)]
+    fn remember(
+        &self,
+        dir: &Path,
+        l: &korek_core::Loaded,
+        n_files: usize,
+        lock: Option<&str>,
+        report: &Report,
+        fresh: Vec<(usize, core::ops::Range<usize>, Vec<Diagnostic>)>,
+        how: &[Result<Result<PathBuf, Builtin>, Error>],
+    ) {
+        let inputs = cache::inputs(&self.loader, &l.sources.files[..n_files], lock);
+        for (i, range, diagnostics) in fresh {
+            let out = &self.outputs[i];
+            let entry = cache::Entry {
+                files: report.files[range]
+                    .iter()
+                    .map(|f| {
+                        (
+                            f.path.clone(),
+                            blake3::hash(f.content.as_bytes()).to_hex().to_string(),
+                        )
+                    })
+                    .collect(),
+                diagnostics,
+                load_warnings: l.warnings.clone(),
+            };
+            cache::store(dir, &cache::key(&inputs, out, binary(&how[i])), &entry);
+        }
+    }
+
+    /// Sorts a plugin's diagnostics into warnings and errors (`--strict`
+    /// makes unsupported rules errors).
+    fn diagnostics(
+        &self,
+        ds: Vec<Diagnostic>,
+        warnings: &mut Vec<Diagnostic>,
+        errors: &mut Vec<Diagnostic>,
+    ) {
+        for mut d in ds {
+            if self.strict && d.code == codes::RULE_UNSUPPORTED {
+                d.severity = Severity::Error;
+            }
+            if d.is_error() {
+                errors.push(d);
+            } else {
+                warnings.push(d);
+            }
+        }
     }
 }

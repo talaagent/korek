@@ -27,6 +27,7 @@ korek-gen-ts = { path = "crates/korek-gen-ts" }
 korek = { path = "crates/korek" }
 korek-testkit = { path = "crates/korek-testkit" }
 anyhow = "1"
+blake3 = "1"
 bpaf = { version = "0.9", features = ["derive"] }
 divan = "0.1"
 heck = "0.5"

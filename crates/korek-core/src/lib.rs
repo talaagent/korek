@@ -63,6 +63,16 @@ pub struct Loaded {
     pub warnings: Vec<Diagnostic>,
 }
 
+/// A schema directory's files, read but not loaded ([`Loader::read`]).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Read {
+    pub files: Vec<SourceFile>,
+    /// The lockfile, if it exists.
+    pub lock: Option<SourceFile>,
+    pub lock_path: PathBuf,
+}
+
 /// Loads every `.kdl` file under `dir` with no extensions.
 ///
 /// # Errors
@@ -106,6 +116,18 @@ impl Loader {
     /// # Errors
     /// Every problem found, with spans.
     pub fn load(&self, dir: &Path) -> Result<Loaded, Failure> {
+        let read = self.read(dir)?;
+        let mut loaded = self.load_sources(read.files, read.lock)?;
+        loaded.lock_path = Some(read.lock_path);
+        Ok(loaded)
+    }
+
+    /// Reads the schema files and the lockfile of `dir` without loading
+    /// them (what [`Loader::load`] starts with; a cache can hash them).
+    ///
+    /// # Errors
+    /// A file or directory that cannot be read.
+    pub fn read(&self, dir: &Path) -> Result<Read, Failure> {
         let files = source::read_dir(dir).map_err(|(p, e)| io_failure(&p, &e))?;
         let lock_path = match &self.lock {
             LockAt::InDir => dir.join(LOCK_FILE),
@@ -119,9 +141,16 @@ impl Loader {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => return Err(io_failure(&lock_path, &e)),
         };
-        let mut loaded = self.load_sources(files, lock)?;
-        loaded.lock_path = Some(lock_path);
-        Ok(loaded)
+        Ok(Read {
+            files,
+            lock,
+            lock_path,
+        })
+    }
+
+    /// The names of the registered extensions, in order.
+    pub fn extension_names(&self) -> impl Iterator<Item = &str> {
+        self.exts.iter().map(|e| e.name())
     }
 
     /// Loads in-memory files as one schema, numbering against `lock`.

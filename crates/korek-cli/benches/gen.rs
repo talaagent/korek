@@ -92,15 +92,20 @@ fn driver(dir: &Path, subprocess: bool) -> Driver {
     d
 }
 
-/// `korek gen` with all five generators, outputs already up to date.
-#[divan::bench(args = [false, true], sample_count = 20)]
-fn full_gen(b: Bencher, subprocess: bool) {
+/// `korek gen` with all five generators, outputs already up to date:
+/// builtin plugins, subprocess plugins, and builtins with the input-hash
+/// cache warm.
+#[divan::bench(args = ["builtin", "subprocess", "cached"], sample_count = 20)]
+fn full_gen(b: Bencher, how: &str) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("schema")).unwrap();
     for f in &*FILES {
         std::fs::write(dir.path().join("schema").join(&f.path), &f.contents).unwrap();
     }
-    let d = driver(dir.path(), subprocess);
+    let mut d = driver(dir.path(), how == "subprocess");
+    if how == "cached" {
+        d = d.cache(Some(dir.path().join("cache")));
+    }
     d.run(&dir.path().join("schema")).unwrap();
     b.bench(|| d.run(&dir.path().join("schema")).unwrap());
 }
