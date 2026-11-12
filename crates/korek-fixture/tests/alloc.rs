@@ -3,8 +3,9 @@
 
 #![allow(unsafe_code, clippy::unwrap_used)]
 
+use core::alloc::{GlobalAlloc, Layout};
 use core::sync::atomic::{AtomicUsize, Ordering};
-use std::alloc::{GlobalAlloc, Layout, System};
+use std::alloc::System;
 
 use korek_fixture::example::{Contact, McpServer, SearchRequest};
 use korek_runtime::Validate as _;
