@@ -304,8 +304,9 @@ output through `korek-testkit` to check it agrees with the shared vectors.
 
 Not in v1: `korek fmt`, a docs/markdown generator, schema imports across
 packages, breaking-change detection against a git ref, an LSP, Python and Go
-generators, recursive types, defining korek's own IR in a korek schema
-(self-hosting; [schema/korek](schema/korek) is the start).
+generators, recursive types, generating korek's own IR from its korek schema
+([schema/korek](schema/korek) describes it and is checked against it; see
+"Self-hosting" in CLAUDE.md).
 
 ## Development
 

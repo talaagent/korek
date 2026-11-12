@@ -14,6 +14,9 @@ korek-runtime.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
+korek-core.workspace = true
+korek-ir.workspace = true
+korek-testkit.workspace = true
 serde_json.workspace = true
 
 [build-dependencies]

@@ -18,7 +18,9 @@ Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zo
 - `crates/korek-testkit`: shared rule vectors (`vectors/rules.json`) run against the loader, generated Rust
   (build script), generated Zod (`ts/vectors.test.ts`) and generated Protobuf under protovalidate-es
   (`ts/protovalidate.test.ts`, descriptors from `buf build` of `gen/proto`).
-- `crates/korek-fixture`: `include!`s the generated Rust for `examples/basic` so it is compiled and tested.
+- `crates/korek-fixture`: `include!`s the generated Rust for `examples/basic` so it is compiled and tested;
+  its `build.rs` also generates `schema/korek` (see Self-hosting).
+- `schema/korek`: korek's own IR (`ir.kdl`) and plugin protocol (`protocol.kdl`) as a korek schema.
 - `examples/basic`: the example schema; `gen/` holds the golden outputs (`crates/korek/tests/golden.rs`).
 - `examples/plugin-example`: a third-party plugin and a driver test for it.
 - `ts/`: `bun test` for the Zod output (root `package.json`, `tsconfig.json`).
@@ -53,3 +55,35 @@ nix develop -c sh -c 'bun install && bun test && bun run typecheck'
 - Generated code must pass the downstream tools: Rust compiles (fixture), proto passes `buf lint` and
   `buf build`, Zod passes `bun test` and `tsc`.
 - No "kdl" in crate, binary or module names; KDL is only the input format.
+- Changing an IR or protocol type means changing `schema/korek` too; `crates/korek-fixture/tests/selfhost.rs`
+  fails when they disagree (new `RuleKind`s also go in its `every_rule()`).
+
+## Self-hosting
+
+`schema/korek` describes `korek_ir::ir` and `korek_ir::protocol` with the same type, field and variant names
+and the same JSON. `crates/korek-fixture/tests/selfhost.rs` serializes real IR (examples/basic, the rule
+vectors, schema/korek itself, every rule kind and type) with korek-ir, deserializes it through the Rust
+generated from `schema/korek` and checks the JSON comes back identical (and back into korek-ir equal).
+Where korek cannot say what korek-ir says, the schema uses the closest form with the same JSON:
+
+- `#[serde(default, skip_serializing_if = …)]` fields are `optional=#true` (`Option<Vec<T>>`, `Option<bool>`
+  where korek-ir has `Vec<T>`, `bool`): korek has no "default, omitted when default".
+- Externally tagged enums (`Type`, `TypeKind`) are untagged unions: an enum for the unit variants
+  (`Primitive`) and one-field structs for the others (`ListType { list }`, `EnumKind { enum }`).
+- Recursion (`Type` inside `list<T>`/`map<string,T>`, nested `Validate` in `items`/`keys`/`values`) is
+  `json`: korek rejects recursive types (`korek::cycle`).
+- Unit rule variants (`finite`, `unique`, …) carry an empty struct (`NoOperand`); variants with the same
+  operands share a struct (`CountOperand`), so the generated enum has newtype variants.
+- `Box`, `Copy`/`Eq`/`Hash` derives, `#[non_exhaustive]` and the hand-written helpers (`impls.rs`) have no
+  counterpart.
+
+Bootstrap plan, to replace the hand-written types:
+
+1. Close the gaps above: recursive types (Rust `Box` on cycles, Zod `z.lazy`), a "default, omitted when
+   default" field mode, and externally tagged unions (or accept the untagged form in the IR).
+2. Generate `korek-ir`'s types from `schema/korek` with korek-gen-rust and diff them against `ir.rs`/
+   `protocol.rs` (the round-trip test keeps the JSON in step meanwhile).
+3. Swap: `korek-ir` `include!`s a checked-in generated copy (`crates/korek-ir/src/generated.rs`), keeping
+   `impls.rs`; a test regenerates it and fails on a diff (like the goldens, blessed with `KOREK_BLESS=1`).
+4. The checked-in copy is the bootstrap: korek builds from it, never from its own output at build time, so a
+   broken generator cannot break its own build; regenerate and review the diff when the schema changes.
