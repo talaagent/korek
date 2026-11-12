@@ -120,6 +120,7 @@ impl Type {
             Self::F64 => "f64",
             Self::Timestamp => "timestamp",
             Self::Duration => "duration",
+            Self::Json => "json",
             _ => return None,
         })
     }
@@ -138,6 +139,7 @@ impl Type {
             "f64" => Self::F64,
             "timestamp" => Self::Timestamp,
             "duration" => Self::Duration,
+            "json" => Self::Json,
             _ => return None,
         })
     }

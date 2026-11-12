@@ -32,4 +32,5 @@ keys "claude" {
     validate { min_len 20 }
     meta "acme.ui" widget="password" group="auth"
   }
+  key "metadata" "json" default=#"{"team": "core"}"# { doc "Sent with each request." }
 }

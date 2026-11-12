@@ -193,6 +193,7 @@ impl Gen<'_> {
             Type::F64 => "z.number()".to_owned(),
             Type::Timestamp => "z.iso.datetime({ offset: true })".to_owned(),
             Type::Duration => "z.string().regex(/^-?\\d+(\\.\\d+)?s$/)".to_owned(),
+            Type::Json => "z.json()".to_owned(),
             Type::List(t) => {
                 let empty = Validate::default();
                 format!(

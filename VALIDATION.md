@@ -52,7 +52,7 @@ generated Rust and the generated Zod; they must all agree.
 | `required` | struct/union fields, enums, unions | ✓ (`required`, `oneof.required`) | ✓ | ✓ | ✓ `required` |
 | `defined_only` | enums | ✓ | n/a | n/a | n/a |
 | `gt_now` / `lt_now` / `within` | timestamp | ✓ | ≈ refine | ✓ | — |
-| `cel` | any | ✓ field/message CEL | with `ts="…"`, else — | with `rust="…"`, else — | — |
+| `cel` | any (the only rule for `json`) | ✓ field/message CEL | with `ts="…"`, else — | with `rust="…"`, else — | — |
 
 Non-optional message fields (structs, unions, timestamps, durations) are
 always `required` in Protobuf: korek's "present" is protovalidate's
@@ -63,5 +63,7 @@ always `required` in Protobuf: korek's "present" is protovalidate's
 All targets agree on one JSON form per type (the generated Rust serde, Zod,
 TypeScript and JSON Schema): integers are numbers; `bytes` is base64;
 `timestamp` is RFC 3339; `duration` is seconds with an `s` suffix (`"1.5s"`,
-as in the Protobuf JSON mapping); enums are their variant names; tagged
+as in the Protobuf JSON mapping); `json` is any JSON value (Protobuf
+`google.protobuf.Value`, whose JSON mapping is the value itself; an optional
+`json` field set to `null` reads back as absent in Rust); enums are their variant names; tagged
 unions carry the tag field next to the variant's fields.

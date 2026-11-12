@@ -148,6 +148,7 @@ Contacts are matched by `id`; names are free text.
 | `tags` | `map<string,list<string>>`, optional |  | Tag groups.<br><br>Rules: At most 16 entries. |
 | `created` | `timestamp` |  | Rules: In the past. |
 | `phone` | `string`, optional |  | Rules: An E.164 phone number.<br><br>Since 1.2. |
+| `extra` | `json`, optional |  | Free-form metadata from the importer.<br><br>Example: `{"source":"vcard","rev":3}`. |
 
 <a id="keys"></a>
 
@@ -229,6 +230,7 @@ Turn timeout.
 | [`claude.mcp_servers`](#key.claude.mcp_servers) | `map<string,`[`McpServer`](#type.McpServer)`>` | `{}` |  |
 | [`claude.model`](#key.claude.model) | `string` |  | Model override; unset means the account default. |
 | [`claude.api_key`](#key.claude.api_key) | `string` |  | **Secret.** |
+| [`claude.metadata`](#key.claude.metadata) | `json` | `{"team":"core"}` | Sent with each request. |
 
 <a id="key.claude.mcp_servers"></a>
 
@@ -264,6 +266,15 @@ Model override; unset means the account default.
 - Type: `string`
 - Rules: At least 20 characters.
 - **Secret**: never printed or shown with its value.
+
+<a id="key.claude.metadata"></a>
+
+#### `claude.metadata`
+
+Sent with each request.
+
+- Type: `json`
+- Default: `{"team":"core"}`
 
 <a id="services"></a>
 

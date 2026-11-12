@@ -129,3 +129,4 @@ Contacts are matched by `id`; names are free text.
 | `tags` | `map<string,list<string>>`, optional |  | Tag groups.<br><br>Rules: At most 16 entries. |
 | `created` | `timestamp` |  | Rules: In the past. |
 | `phone` | `string`, optional |  | Rules: An E.164 phone number.<br><br>Since 1.2. |
+| `extra` | `json`, optional |  | Free-form metadata from the importer.<br><br>Example: `{"source":"vcard","rev":3}`. |

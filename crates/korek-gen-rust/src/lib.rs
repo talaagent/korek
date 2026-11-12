@@ -64,6 +64,7 @@ pub fn rust_type(ty: &Type) -> String {
         Type::F64 => "f64".into(),
         Type::List(t) => format!("Vec<{}>", rust_type(t)),
         Type::Map(t) => format!("::std::collections::BTreeMap<String, {}>", rust_type(t)),
+        Type::Json => format!("{RT}::serde_json::Value"),
         Type::Named(n) => n.clone(),
     }
 }
@@ -428,6 +429,10 @@ pub fn literal<S: Types + ?Sized>(schema: &S, v: &Value) -> String {
             format!("{ty} {{ {} }}", fs.join(", "))
         }
         Value::Union { ty, variant, value } => format!("{ty}::{}({})", pascal(variant), lit(value)),
+        Value::Json(j) => format!(
+            "{RT}::serde_json::from_str::<{RT}::serde_json::Value>({:?}).expect(\"valid JSON\")",
+            j.to_string()
+        ),
         _ => "unreachable!()".into(),
     }
 }

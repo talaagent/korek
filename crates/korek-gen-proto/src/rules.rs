@@ -78,7 +78,7 @@ fn kind_name(ty: &Type, kind: Option<&TypeKind>) -> &'static str {
         Type::List(_) => "repeated",
         Type::Map(_) => "map",
         Type::Named(_) if matches!(kind, Some(TypeKind::Enum(_))) => "enum",
-        Type::Named(_) => "",
+        Type::Named(_) | Type::Json => "",
     }
 }
 

@@ -114,6 +114,11 @@ export interface Contact {
    * @format e164
    */
   phone?: string;
+  /**
+   * Free-form metadata from the importer.
+   * @example {"source":"vcard","rev":3}
+   */
+  extra?: unknown;
 }
 
 /** Every key, by its full dotted name. */
@@ -163,6 +168,11 @@ export interface Keys {
    * @secret
    */
   "claude.api_key": string;
+  /**
+   * Sent with each request.
+   * @default {"team":"core"}
+   */
+  "claude.metadata": unknown;
 }
 
 /** The defaults of the keys that have one. */
@@ -174,4 +184,5 @@ export const keyDefaults: Partial<Keys> = {
   "session.turn_limit": 50,
   "session.max_turns": 20,
   "claude.mcp_servers": {},
+  "claude.metadata": {"team":"core"},
 };

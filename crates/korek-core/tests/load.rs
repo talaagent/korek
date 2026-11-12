@@ -175,6 +175,40 @@ fn bad_defaults() {
 }
 
 #[test]
+fn json_values() {
+    use korek_core::ir::Type;
+    use serde_json::json;
+    let loaded = load(
+        r##"keys "s" {
+  key "a" "json" default=#"{"x": [1, null]}"#
+  key "b" "json" default=3
+  key "c" "list<json>" default="[true, \"s\"]"
+  key "d" "json" { validate { cel id="obj" expression="this != null" } }
+}"##,
+    )
+    .unwrap();
+    let keys = &loaded.schema.keys[0].keys;
+    assert_eq!(keys[0].ty, Type::Json);
+    assert_eq!(keys[0].default, Some(json!({"x": [1, null]})));
+    assert_eq!(keys[1].default, Some(json!(3)));
+    assert_eq!(keys[2].default, Some(json!([true, "s"])));
+    // A string default is JSON text, as for lists and maps.
+    fails(
+        "keys \"s\" { key \"a\" \"json\" default=\"plain\" }",
+        "korek::invalid_default",
+    );
+    // Only `cel` applies.
+    fails(
+        "struct A { field a \"json\" { validate { min_len 1 } } }",
+        "korek::invalid_rule",
+    );
+    fails(
+        "struct A { field a \"json\" { validate { const 1 } } }",
+        "korek::invalid_rule",
+    );
+}
+
+#[test]
 fn constraint_violations() {
     fails(
         "keys \"s\" { key \"a\" \"u64\" default=0 { validate { gte 1 } } }",

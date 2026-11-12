@@ -9,6 +9,7 @@ keys "claude" {
     item "mcp_servers" 1
     item "model" 2
     item "api_key" 3
+    item "metadata" 4
 }
 keys "session" {
     item "steer.enabled" 1
@@ -27,6 +28,7 @@ struct "Contact" {
     item "tags" 6
     item "created" 7
     item "phone" 8
+    item "extra" 9
 }
 struct "GetRequest" {
     item "id" 1

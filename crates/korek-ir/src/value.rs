@@ -20,6 +20,8 @@ pub enum Value {
     Timestamp(String),
     /// `"1.5s"` text.
     Duration(String),
+    /// Any JSON, as is.
+    Json(Json),
     List(Vec<Value>),
     Map(Vec<(String, Value)>),
     Enum {
@@ -63,6 +65,7 @@ pub fn resolve<S: Types + ?Sized>(schema: &S, ty: &Type, j: &Json) -> Result<Val
         Type::Bytes => Value::Bytes(str_of()?),
         Type::Timestamp => Value::Timestamp(str_of()?),
         Type::Duration => Value::Duration(str_of()?),
+        Type::Json => Value::Json(j.clone()),
         Type::I32 => Value::Int(
             j.as_i64()
                 .filter(|i| i32::try_from(*i).is_ok())

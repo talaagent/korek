@@ -49,6 +49,7 @@ pub fn ts_type(ty: &Type) -> String {
         Type::I32 | Type::I64 | Type::U32 | Type::U64 | Type::F32 | Type::F64 => "number".into(),
         Type::List(t) => format!("{}[]", ts_type(t)),
         Type::Map(t) => format!("Record<string, {}>", ts_type(t)),
+        Type::Json => "unknown".into(),
         Type::Named(n) => n.clone(),
     }
 }
