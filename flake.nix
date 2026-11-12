@@ -47,7 +47,12 @@
               ./examples
             ];
           };
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            # talaagent/kdl-serde (kdl-load, kdl-nodes, kdl-span) is private: fetch it
+            # at evaluation time with the user's git credentials.
+            allowBuiltinFetchGit = true;
+          };
           cargoBuildFlags = [
             "-p"
             "korek-cli"
