@@ -309,6 +309,7 @@ cargo test --workspace
 bun install && bun test && bun run typecheck
 KOREK_BLESS=1 cargo test -p korek-cli --test golden    # regenerate goldens
 KOREK_BLESS=1 cargo test -p korek-testkit               # after editing the vectors
+cargo bench -p korek-cli                                # see BENCHMARKS.md
 ```
 
 Licensed under Apache-2.0.
