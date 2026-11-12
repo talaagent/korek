@@ -41,7 +41,7 @@ generated Rust and the generated Zod; they must all agree.
 | `uri` / `url` | string | ✓ `uri` | ≈ / ✓ `z.url()` | ✓ | ✓ `uri` |
 | `tuuid` | string | ✓ | ≈ regex | ✓ | ≈ |
 | `cuid` `cuid2` `nanoid` `base64` `base64url` `jwt` `e164` `lowercase` `uppercase` | string | ≈ CEL `matches` | ✓ | ✓ | ≈ `pattern` |
-| `datetime` `date` `time` `iso_duration` | string | ≈ CEL `matches` | ✓ `z.iso.*` | ✓ | ✓ `format` |
+| `datetime` `date` `time` `iso_duration` | string | ≈ CEL `matches` (calendar-aware dates) | ✓ `z.iso.*` | ✓ | ✓ `format` |
 | `emoji` | string | — | ✓ | ✓ (`regex` feature) | — |
 | `gt` / `gte` / `lt` / `lte` | numbers, timestamp, duration | ✓ | ✓ / ≈ for time | ✓ | ✓ numbers; — time |
 | `finite` | floats | ✓ | n/a (Zod rejects ±∞) | ✓ | n/a |

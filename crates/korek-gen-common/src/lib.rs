@@ -151,6 +151,16 @@ pub fn js(v: &serde_json::Value) -> String {
     v.to_string()
 }
 
+/// A `YYYY-MM-DD` calendar date, leap years included (no anchors).
+macro_rules! date_regex {
+    () => {
+        concat!(
+            r"(\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\d|3[01])|(0[469]|11)-(0[1-9]|[12]\d|30)|02-(0[1-9]|1\d|2[0-8]))",
+            r"|(\d{2}(0[48]|[2468][048]|[13579][26])|([02468][048]|[13579][26])00)-02-29)"
+        )
+    };
+}
+
 /// Regular expressions (valid in RE2 and ECMAScript) for formats that some
 /// targets have no native check for.
 pub fn format_regex(f: Format) -> Option<&'static str> {
@@ -158,11 +168,13 @@ pub fn format_regex(f: Format) -> Option<&'static str> {
         Format::Cuid => r"^c[^\s-]{8,}$",
         Format::Cuid2 => "^[0-9a-z]+$",
         Format::Nanoid => "^[a-zA-Z0-9_-]{21}$",
-        Format::Date => r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$",
+        Format::Date => concat!("^", date_regex!(), "$"),
         Format::Time => r"^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?$",
-        Format::Datetime => {
-            r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$"
-        }
+        Format::Datetime => concat!(
+            "^",
+            date_regex!(),
+            r"[Tt]([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?([Zz]|[+-]([01]\d|2[0-3]):[0-5]\d)$"
+        ),
         Format::Duration => r"^P(\d+W|(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?)$",
         Format::Base64 => "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
         Format::Base64url => "^[A-Za-z0-9_-]*$",
