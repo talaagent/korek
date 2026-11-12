@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Off while the repo is private (no Actions minutes); on once public.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: Swatinem/rust-cache@v2
+      - name: fmt
+        run: nix develop -c cargo fmt --all --check
+      - name: clippy
+        run: nix develop -c cargo clippy --workspace --all-targets -- -D warnings
+      - name: test
+        run: nix develop -c cargo test --workspace
+      - name: generated files are fresh
+        run: nix develop -c cargo run -q -p korek -- gen --check --rust examples/basic/gen/rust --proto examples/basic/gen/proto --zod examples/basic/gen/zod --ts examples/basic/gen/ts examples/basic/schema
+      - name: bun test
+        working-directory: ts
+        run: nix develop -c sh -c 'bun install --frozen-lockfile && bun test && bun run typecheck'

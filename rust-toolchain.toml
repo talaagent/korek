@@ -1,0 +1,5 @@
+# The flake reads this through rust-overlay, so rustup users, editors and
+# `nix develop` share one toolchain.
+[toolchain]
+channel = "stable"
+components = ["rustfmt", "clippy", "rust-src"]

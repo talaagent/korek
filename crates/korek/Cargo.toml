@@ -1,0 +1,20 @@
+[package]
+name = "korek"
+description = "Define types once in KDL, cast them into Rust, Protobuf, Zod and TypeScript"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "korek"
+path = "src/main.rs"
+
+[dependencies]
+korek-core.workspace = true

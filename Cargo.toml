@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/talaagent/korek"
+authors = ["Ian Macalinao <github@igm.pub>"]
+rust-version = "1.85"
+publish = false
+
+[workspace.dependencies]
+korek-core = { path = "crates/korek-core" }
+korek = { path = "crates/korek" }
+bpaf = { version = "0.9", features = ["derive"] }
+heck = "0.5"
+kdl = "6"
+miette = "7"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+must_use_candidate = "allow"
+module_name_repetitions = "allow"
+unwrap_used = "deny"
+std_instead_of_alloc = "deny"
+std_instead_of_core = "deny"
+cognitive_complexity = "deny"
+too_many_lines = "deny"
+clone_on_ref_ptr = "deny"
