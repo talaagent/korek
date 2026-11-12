@@ -1,0 +1,42 @@
+package "example.v1"
+
+enum Backend {
+  doc "Which provider runs a turn."
+  variant claude { doc "Claude Code." }
+  variant codex { doc "OpenAI Codex." }
+}
+
+struct McpStdio {
+  doc "An MCP server started as a child process."
+  field command "string" { doc "The program to run."; min_len 1 }
+  field args "list<string>" optional=#true
+  field env "map<string,string>" optional=#true { doc "Extra environment variables." }
+}
+
+struct McpHttp {
+  doc "An MCP server reached over HTTP."
+  field url "string" { pattern "^https?://" }
+  field timeout_ms "u64" optional=#true { min 1; max 600000 }
+}
+
+union McpServer tag="type" {
+  doc "How to reach an MCP server."
+  variant stdio "McpStdio"
+  variant http "McpHttp"
+}
+
+// Untagged: the first variant whose type matches.
+union Limit {
+  doc "A limit: a count, or a named preset."
+  variant count "u64"
+  variant preset "string"
+}
+
+struct Contact {
+  field id "string"
+  field name "string" { max_len 200 }
+  field emails "list<string>" { max_len 10 }
+  field score "f64" optional=#true { min 0.0; max 1.0 }
+  field avatar "bytes" optional=#true
+  field tags "map<string,list<string>>" optional=#true { doc "Tag groups." }
+}

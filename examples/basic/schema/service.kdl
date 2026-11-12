@@ -1,0 +1,24 @@
+struct SearchRequest {
+  field query "string" { min_len 1 }
+  field limit "u64" optional=#true { max 100 }
+}
+
+struct SearchResponse {
+  field contacts "list<Contact>"
+}
+
+struct GetRequest {
+  field id "string"
+}
+
+struct GetResponse {
+  field contact "Contact"
+}
+
+service ContactsService {
+  doc "Look up contacts."
+  rpc Search input="SearchRequest" output="SearchResponse" idempotency="no_side_effects" {
+    doc "Full-text search over names and emails."
+  }
+  rpc Get input="GetRequest" output="GetResponse" idempotency="no_side_effects"
+}
