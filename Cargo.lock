@@ -264,6 +264,8 @@ dependencies = [
 name = "korek-fixture"
 version = "0.1.0"
 dependencies = [
+ "korek-core",
+ "korek-gen-rust",
  "korek-runtime",
  "serde",
  "serde_json",

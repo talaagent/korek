@@ -1,6 +1,8 @@
 //! The runtime for korek's generated Rust: [`Validate`], validation errors
 //! with paths, string format checks ([`format`]), the base64 serde adapter
-//! for `bytes` ([`base64`]) and `timestamp`/`duration` parsing ([`time`]).
+//! for `bytes` ([`base64`]), `timestamp`/`duration` parsing and the
+//! `Duration` codecs for integers with a time unit ([`time`]), and
+//! composable serde codecs for nested fields ([`with`]).
 //!
 //! Validation does not allocate on the success path: paths are built on the
 //! stack ([`Path`]) and only formatted when a rule fails.
@@ -10,6 +12,7 @@ extern crate alloc;
 pub mod base64;
 pub mod format;
 pub mod time;
+pub mod with;
 
 use core::fmt;
 

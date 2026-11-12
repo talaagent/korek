@@ -21,12 +21,16 @@ use korek_plugin::{File, GenerateRequest, GenerateResponse, Hook, Item};
 #[non_exhaustive]
 pub struct Options {
     pub file: String,
+    /// Integer fields and keys with a time `unit` (`nanoseconds` through
+    /// `hours`) become `core::time::Duration`, still the integer in JSON.
+    pub duration: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Self {
             file: "types.rs".into(),
+            duration: false,
         }
     }
 }
@@ -36,10 +40,18 @@ impl Default for Options {
 /// # Errors
 /// On unknown options.
 pub fn plugin(req: &GenerateRequest) -> Result<GenerateResponse, Diagnostic> {
-    req.check_options(&["file"])?;
+    req.check_options(&["file", "rust_duration"])?;
     let mut opts = Options::default();
     if let Some(f) = req.options.get("file") {
         opts.file.clone_from(f);
+    }
+    if let Some(v) = req.options.get("rust_duration") {
+        opts.duration = v.parse().map_err(|_| {
+            Diagnostic::error(
+                korek_ir::codes::INVALID_OPTION,
+                format!("rust_duration must be true or false, not `{v}`"),
+            )
+        })?;
     }
     let (files, warnings) = generate(&req.schema, &opts, &[]);
     Ok(GenerateResponse::new(files).with_diagnostics(warnings))
@@ -63,6 +75,71 @@ pub fn rust_type(ty: &Type) -> String {
         Type::List(t) => format!("Vec<{}>", rust_type(t)),
         Type::Map(t) => format!("::std::collections::BTreeMap<String, {}>", rust_type(t)),
         Type::Named(n) => n.clone(),
+    }
+}
+
+/// The runtime codec for a type holding `bytes` below the top level
+/// (`list<bytes>`, `map<string,list<bytes>>`, …).
+fn nested_codec(ty: &Type) -> Option<String> {
+    match ty {
+        Type::Bytes => Some(format!("{RT}::base64::Base64")),
+        Type::List(t) => nested_codec(t).map(|c| format!("{RT}::with::List<{c}>")),
+        Type::Map(t) => nested_codec(t).map(|c| format!("{RT}::with::Map<{c}>")),
+        _ => None,
+    }
+}
+
+/// The `#[serde(with)]` target for a value of `ty` (`opt`: in an `Option`),
+/// or `None` when serde's own form is the JSON form.
+fn serde_with(ty: &Type, unit: Option<&str>, opt: bool) -> Option<String> {
+    let codec = match unit {
+        Some(u) => format!("{RT}::time::{u}"),
+        None if *ty == Type::Bytes => {
+            return Some(format!("{RT}::base64{}", if opt { "::option" } else { "" }));
+        }
+        None => nested_codec(ty)?,
+    };
+    let codec = if opt {
+        format!("{RT}::with::Opt<{codec}>")
+    } else {
+        codec
+    };
+    Some(format!("{RT}::with::As::<{codec}>"))
+}
+
+/// With the `rust_duration` option: the runtime unit for an integer with a
+/// time `unit`.
+pub(crate) fn duration_unit(on: bool, ty: &Type, attrs: &korek_ir::Attrs) -> Option<&'static str> {
+    if !on || !ty.is_integer() {
+        return None;
+    }
+    Some(match attrs.unit.as_deref()? {
+        "nanoseconds" => "Nanoseconds",
+        "microseconds" => "Microseconds",
+        "milliseconds" => "Milliseconds",
+        "seconds" => "Seconds",
+        "minutes" => "Minutes",
+        "hours" => "Hours",
+        _ => return None,
+    })
+}
+
+const DURATION: &str = "::core::time::Duration";
+
+/// A `Duration` expression for `n` of `unit`.
+fn duration_literal(unit: &str, v: &Value) -> String {
+    let n = match v {
+        Value::Int(i) => u64::try_from(*i).unwrap_or_default(),
+        Value::Uint(u) => *u,
+        _ => 0,
+    };
+    match unit {
+        "Nanoseconds" => format!("{DURATION}::from_nanos({n})"),
+        "Microseconds" => format!("{DURATION}::from_micros({n})"),
+        "Milliseconds" => format!("{DURATION}::from_millis({n})"),
+        "Minutes" => format!("{DURATION}::from_secs({})", n.saturating_mul(60)),
+        "Hours" => format!("{DURATION}::from_secs({})", n.saturating_mul(3600)),
+        _ => format!("{DURATION}::from_secs({n})"),
     }
 }
 
@@ -109,6 +186,7 @@ fn rules_doc(v: &korek_ir::Validate) -> Vec<String> {
 
 struct Gen<'a> {
     schema: &'a Schema,
+    opts: &'a Options,
     out: String,
     warnings: Vec<Diagnostic>,
 }
@@ -122,6 +200,7 @@ pub fn generate(
 ) -> (Vec<File>, Vec<Diagnostic>) {
     let mut g = Gen {
         schema,
+        opts,
         out: String::with_capacity(32 * 1024),
         warnings: Vec::new(),
     };
@@ -182,6 +261,9 @@ impl Gen<'_> {
                     if u.tag.is_some() {
                         let _ = writeln!(self.out, "    #[serde(rename = {:?})]", v.name);
                     }
+                    if let Some(w) = serde_with(&v.ty, None, false) {
+                        let _ = writeln!(self.out, "    #[serde(with = \"{w}\")]");
+                    }
                     let _ = writeln!(self.out, "    {}({}),", pascal(&v.name), rust_type(&v.ty));
                 }
                 self.out.push_str("}\n");
@@ -190,9 +272,22 @@ impl Gen<'_> {
         self.validate_impl(t);
     }
 
+    fn unit(&self, ty: &Type, attrs: &korek_ir::Attrs) -> Option<&'static str> {
+        duration_unit(self.opts.duration, ty, attrs)
+    }
+
+    /// The Rust type of a field or key, before `Option`.
+    fn value_type(&self, ty: &Type, attrs: &korek_ir::Attrs) -> String {
+        if self.unit(ty, attrs).is_some() {
+            DURATION.into()
+        } else {
+            rust_type(ty)
+        }
+    }
+
     /// The field's Rust type: `Option<T>` when optional without a default.
-    fn field_type(f: &Field) -> String {
-        let ty = rust_type(&f.ty);
+    fn field_type(&self, f: &Field) -> String {
+        let ty = self.value_type(&f.ty, &f.attrs);
         if f.optional && f.default.is_none() {
             format!("Option<{ty}>")
         } else {
@@ -210,11 +305,8 @@ impl Gen<'_> {
             docs(&mut self.out, "    ", &f.attrs, &rules_doc(&f.validate));
             let opt = f.optional && f.default.is_none();
             let mut serde = Vec::new();
-            if f.ty == Type::Bytes {
-                serde.push(format!(
-                    "with = \"{RT}::base64{}\"",
-                    if opt { "::option" } else { "" }
-                ));
+            if let Some(w) = serde_with(&f.ty, self.unit(&f.ty, &f.attrs), opt) {
+                serde.push(format!("with = \"{w}\""));
             }
             if opt {
                 serde.push("default".into());
@@ -230,7 +322,7 @@ impl Gen<'_> {
                 self.out,
                 "    pub {}: {},",
                 rust_ident(&f.name),
-                Self::field_type(f)
+                self.field_type(f)
             );
         }
         self.out.push_str("}\n");
@@ -238,15 +330,14 @@ impl Gen<'_> {
         if !defaults.is_empty() {
             let _ = writeln!(self.out, "\nimpl {} {{", t.name);
             for f in &defaults {
-                let lit = f
-                    .default
-                    .as_ref()
-                    .map_or_else(String::new, |d| self.literal_json(&f.ty, d));
+                let lit = f.default.as_ref().map_or_else(String::new, |d| {
+                    self.literal_json(&f.ty, self.unit(&f.ty, &f.attrs), d)
+                });
                 let _ = writeln!(
                     self.out,
                     "    pub fn default_{}() -> {} {{\n        {lit}\n    }}",
                     f.name,
-                    rust_type(&f.ty)
+                    self.value_type(&f.ty, &f.attrs)
                 );
             }
             self.out.push_str("}\n");
@@ -271,7 +362,13 @@ impl Gen<'_> {
 
     fn validate_impl(&mut self, t: &TypeDef) {
         let mut body = String::new();
-        validate::type_body(self.schema, t, &mut body, &mut self.warnings);
+        validate::type_body(
+            self.schema,
+            t,
+            self.opts.duration,
+            &mut body,
+            &mut self.warnings,
+        );
         let unused = if body.trim().is_empty() {
             "        let _ = (path, errors);\n"
         } else {
@@ -284,9 +381,14 @@ impl Gen<'_> {
         );
     }
 
-    fn literal_json(&self, ty: &Type, j: &korek_ir::Json) -> String {
-        resolve(self.schema, ty, j)
-            .map_or_else(|_| "unreachable!()".into(), |v| literal(self.schema, &v))
+    fn literal_json(&self, ty: &Type, unit: Option<&str>, j: &korek_ir::Json) -> String {
+        resolve(self.schema, ty, j).map_or_else(
+            |_| "unreachable!()".into(),
+            |v| match unit {
+                Some(u) => duration_literal(u, &v),
+                None => literal_with(self.schema, &v, self.opts.duration),
+            },
+        )
     }
 
     fn keys(&mut self, hooks: &[&dyn Hook]) {
@@ -315,11 +417,12 @@ impl Gen<'_> {
     }
 
     fn key(&mut self, g: &KeyGroup, k: &Key) {
-        let ty = rust_type(&k.ty);
+        let unit = self.unit(&k.ty, &k.attrs);
+        let ty = self.value_type(&k.ty, &k.attrs);
         let ident = shouty(&g.key_ident(k));
         let (default, default_json) = match &k.default {
             Some(j) => (
-                format!("Some(|| {})", self.literal_json(&k.ty, j)),
+                format!("Some(|| {})", self.literal_json(&k.ty, unit, j)),
                 format!("Some({:?})", j.to_string()),
             ),
             None => ("None".into(), "None".into()),
@@ -334,6 +437,9 @@ impl Gen<'_> {
             2,
             &mut self.warnings,
         );
+        if let (Some(u), false) = (unit, check.is_empty()) {
+            check.insert_str(0, &validate::duration_as_int(u, 2));
+        }
         let check_fn = format!("check_{}", g.key_ident(k));
         let unused = if check.trim().is_empty() {
             "        let _ = (v, path, errors);\n"
@@ -378,7 +484,12 @@ impl Gen<'_> {
 
 /// A Rust expression building `v`.
 pub fn literal(schema: &Schema, v: &Value) -> String {
-    let lit = |v: &Value| literal(schema, v);
+    literal_with(schema, v, false)
+}
+
+/// [`literal`], with `duration` the `rust_duration` option.
+fn literal_with(schema: &Schema, v: &Value, duration: bool) -> String {
+    let lit = |v: &Value| literal_with(schema, v, duration);
     match v {
         Value::Bool(b) => b.to_string(),
         Value::String(s) | Value::Timestamp(s) | Value::Duration(s) => {
@@ -412,6 +523,8 @@ pub fn literal(schema: &Schema, v: &Value) -> String {
                     let f = def(k);
                     let has_default = f.is_some_and(|f| f.default.is_some());
                     let optional = f.is_some_and(|f| f.optional) && !has_default;
+                    let unit = f.and_then(|f| duration_unit(duration, &f.ty, &f.attrs));
+                    let lit = |v: &Value| unit.map_or_else(|| lit(v), |u| duration_literal(u, v));
                     let v = match v {
                         None if has_default => format!("{ty}::default_{k}()"),
                         None => "None".into(),

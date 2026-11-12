@@ -61,7 +61,9 @@ always `required` in Protobuf: korek's "present" is protovalidate's
 ## JSON forms
 
 All targets agree on one JSON form per type (the generated Rust serde, Zod,
-TypeScript and JSON Schema): integers are numbers; `bytes` is base64;
+TypeScript and JSON Schema): integers are numbers (also as Rust `Duration`s
+under `rust_duration`); `bytes` is base64 at any depth (`list<bytes>`,
+`map<string,bytes>`, …);
 `timestamp` is RFC 3339; `duration` is seconds with an `s` suffix (`"1.5s"`,
 as in the Protobuf JSON mapping); enums are their variant names; tagged
 unions carry the tag field next to the variant's fields.
