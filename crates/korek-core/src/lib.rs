@@ -21,6 +21,7 @@ pub mod ext;
 pub mod lock;
 mod parse;
 pub mod source;
+mod syntax;
 pub mod types;
 mod validate;
 

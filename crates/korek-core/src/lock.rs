@@ -10,12 +10,10 @@ use alloc::collections::BTreeMap;
 use core::fmt::Write as _;
 use std::collections::HashMap;
 
-use kdl::KdlDocument;
-
 use korek_ir::codes;
 use korek_ir::{Diagnostic, Retired, Schema, Span, TypeKind};
 
-use crate::ext::{Literal, Node, span_of};
+use crate::ext::Literal;
 use crate::source::SourceFile;
 
 /// The lockfile's file name in a schema directory.
@@ -39,22 +37,17 @@ impl Lock {
     /// # Errors
     /// Diagnostics for malformed entries.
     pub fn parse(src: &SourceFile, file: u32) -> Result<Self, Vec<Diagnostic>> {
-        let doc = KdlDocument::parse_v2(&src.contents).map_err(|e| {
-            e.diagnostics
-                .into_iter()
-                .map(|d| {
-                    Diagnostic::error(
-                        codes::LOCKFILE,
-                        d.message.unwrap_or_else(|| "invalid lockfile".into()),
-                    )
-                    .at(span_of!(file, d.span), "here")
-                })
-                .collect::<Vec<_>>()
-        })?;
+        let doc = crate::syntax::parse(file, &src.path, src.contents.as_str().into()).map_err(
+            |problems| {
+                problems
+                    .into_iter()
+                    .map(|p| Diagnostic::error(codes::LOCKFILE, p.message).at(p.span, "here"))
+                    .collect::<Vec<_>>()
+            },
+        )?;
         let mut lock = Self::default();
         let mut diags = Vec::new();
-        for n in doc.nodes() {
-            let node = Node { inner: n, file };
+        for node in doc.nodes(file) {
             if node.name() == "version" {
                 continue;
             }

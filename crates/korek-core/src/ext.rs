@@ -8,10 +8,11 @@
 //! generator. Extensions define serde types for their metadata and read it
 //! back with [`crate::ir::ext_as`].
 
-use kdl::{KdlEntry, KdlNode, KdlValue};
 use serde_json::Value;
 
 use korek_ir::{Diagnostic, Schema, Span};
+
+pub use crate::syntax::Node;
 
 /// Where a claimed child node or property appeared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,16 +41,6 @@ pub enum Literal {
 }
 
 impl Literal {
-    fn from_kdl(v: &KdlValue) -> Self {
-        match v {
-            KdlValue::String(s) => Self::String(s.clone()),
-            KdlValue::Integer(i) => Self::Int(*i),
-            KdlValue::Float(f) => Self::Float(*f),
-            KdlValue::Bool(b) => Self::Bool(*b),
-            KdlValue::Null => Self::Null,
-        }
-    }
-
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(s),
@@ -96,86 +87,7 @@ pub struct Arg {
     pub span: Span,
 }
 
-/// A read-only view of a schema node, handed to extensions.
-#[derive(Debug, Clone, Copy)]
-pub struct Node<'a> {
-    pub(crate) inner: &'a KdlNode,
-    pub(crate) file: u32,
-}
-
-/// A korek span from a kdl span (whose type comes from miette, which
-/// korek-core does not depend on by default).
-macro_rules! span_of {
-    ($file:expr, $s:expr) => {{
-        let s = $s;
-        #[allow(clippy::cast_possible_truncation)]
-        korek_ir::Span {
-            file: $file,
-            offset: s.offset() as u32,
-            len: s.len() as u32,
-        }
-    }};
-}
-pub(crate) use span_of;
-
-impl<'a> Node<'a> {
-    pub fn name(&self) -> &'a str {
-        self.inner.name().value()
-    }
-
-    pub fn span(&self) -> Span {
-        span_of!(self.file, self.inner.span())
-    }
-
-    /// The span of the node's name.
-    pub fn name_span(&self) -> Span {
-        span_of!(self.file, self.inner.name().span())
-    }
-
-    fn arg_of(&self, e: &KdlEntry) -> Arg {
-        Arg {
-            value: Literal::from_kdl(e.value()),
-            span: span_of!(self.file, e.span()),
-        }
-    }
-
-    /// Positional arguments.
-    pub fn args(&self) -> Vec<Arg> {
-        self.inner
-            .entries()
-            .iter()
-            .filter(|e| e.name().is_none())
-            .map(|e| self.arg_of(e))
-            .collect()
-    }
-
-    /// Properties in source order (`name=value`).
-    pub fn props(&self) -> Vec<(&'a str, Arg)> {
-        self.inner
-            .entries()
-            .iter()
-            .filter_map(|e| e.name().map(|n| (n.value(), self.arg_of(e))))
-            .collect()
-    }
-
-    /// The last property called `name`.
-    pub fn prop(&self, name: &str) -> Option<Arg> {
-        self.props()
-            .into_iter()
-            .rev()
-            .find(|(n, _)| *n == name)
-            .map(|(_, a)| a)
-    }
-
-    pub fn children(&self) -> Vec<Node<'a>> {
-        kdl_nodes::children(self.inner)
-            .map(|n| Node {
-                inner: n,
-                file: self.file,
-            })
-            .collect()
-    }
-
+impl Node<'_> {
     /// A generic JSON form: `{"name", "args", "props", "children"}`, with
     /// empty parts left out.
     pub fn to_json(&self) -> Value {

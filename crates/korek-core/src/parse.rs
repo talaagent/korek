@@ -1,10 +1,8 @@
 //! Source → IR. Reads the grammar; numbers, defaults and examples are
 //! finished by later passes from the side table [`Aux`].
 
-use alloc::sync::Arc;
 use std::collections::HashMap;
 
-use kdl::KdlDocument;
 use korek_ir::codes;
 use korek_ir::{
     Attrs, Diagnostic, EnumDef, EnumVariant, Field, Format, Idempotency, Json, Key, KeyGroup,
@@ -14,6 +12,7 @@ use korek_ir::{
 
 use crate::ext::{Arg, Extension, ItemKind, Literal, Node};
 use crate::source::Sources;
+use crate::syntax;
 use crate::types::parse_type;
 
 /// What later passes need that the IR does not keep, keyed by item span.
@@ -100,60 +99,29 @@ impl<'e> Parser<'e> {
         }
     }
 
-    /// Parses and lowers every file. KDL parsing (`kdl-load`), most of the
-    /// work, runs on one thread per file; lowering is in file order.
+    /// Parses (with kdl-load, one thread per file) and lowers every file,
+    /// in file order.
     pub fn files(&mut self, sources: &Sources) {
-        let parse = |f: &Arc<kdl_span::SourceFile>| {
-            kdl_load::load_str(f.name(), Arc::clone(f.text_arc())).map(|l| l.into_parts().0)
-        };
         let files = sources.files();
-        let docs: Vec<Result<KdlDocument, kdl_load::Error>> = if files.len() > 1 {
-            std::thread::scope(|s| {
-                let handles: Vec<_> = files.iter().map(|f| s.spawn(|| parse(f))).collect();
-                handles
-                    .into_iter()
-                    .zip(files)
-                    .map(|(h, f)| h.join().unwrap_or_else(|_| parse(f)))
-                    .collect()
-            })
-        } else {
-            files.iter().map(parse).collect()
-        };
-        for (file, doc) in files.iter().zip(docs) {
-            self.file(file.name(), doc);
-        }
-    }
-
-    fn file(&mut self, path: &str, doc: Result<KdlDocument, kdl_load::Error>) {
-        #[allow(clippy::cast_possible_truncation)]
-        let id = self.schema.files.len() as u32;
-        self.schema.files.push(path.to_owned());
-        let doc = match doc {
-            Ok(d) => d,
-            Err(kdl_load::Error::Parse(e)) => {
-                for p in e.problems() {
-                    #[allow(clippy::cast_possible_truncation)]
-                    let span = Span {
-                        file: id,
-                        offset: p.label.span.offset as u32,
-                        len: p.label.span.len as u32,
-                    };
-                    let label = p.label.message.as_deref().unwrap_or("here");
-                    let mut diag =
-                        Diagnostic::error(codes::SYNTAX, p.message.clone()).at(span, label);
-                    diag.help.clone_from(&p.help);
-                    self.diags.push(diag);
+        for (file, doc) in files.iter().zip(syntax::parse_all(files)) {
+            #[allow(clippy::cast_possible_truncation)]
+            let id = self.schema.files.len() as u32;
+            self.schema.files.push(file.name().to_owned());
+            match doc {
+                Ok(doc) => {
+                    for n in doc.nodes(id) {
+                        self.top(n);
+                    }
                 }
-                return;
+                Err(problems) => {
+                    for p in problems {
+                        let mut diag =
+                            Diagnostic::error(codes::SYNTAX, p.message).at(p.span, p.label);
+                        diag.help = p.help;
+                        self.diags.push(diag);
+                    }
+                }
             }
-            Err(e) => {
-                self.diags
-                    .push(Diagnostic::error(codes::SYNTAX, e.to_string()));
-                return;
-            }
-        };
-        for n in doc.nodes() {
-            self.top(Node { inner: n, file: id });
         }
     }
 
