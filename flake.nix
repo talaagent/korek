@@ -45,6 +45,9 @@
               ./Cargo.lock
               ./crates
               ./examples
+              ./LICENSE
+              ./NOTICE
+              ./README.md
             ];
           };
           cargoLock = {
@@ -82,6 +85,9 @@
             pkgs.buf
             pkgs.protobuf
             pkgs.git
+            # The test runner and dependency policy check CI uses.
+            pkgs.cargo-nextest
+            pkgs.cargo-deny
           ];
         };
 
