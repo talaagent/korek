@@ -1,5 +1,5 @@
 //! The runtime for korek's generated Rust: [`Validate`], validation errors
-//! with paths, string format checks ([`format`]), the base64 serde adapter
+//! with paths, string format checks ([`format`](mod@format)), the base64 serde adapter
 //! for `bytes` ([`base64`]), `timestamp`/`duration` parsing and the
 //! `Duration` codecs for integers with a time unit ([`time`]),
 //! composable serde codecs for nested fields ([`with`]), and

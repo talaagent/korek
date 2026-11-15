@@ -49,7 +49,7 @@ enum Level {
 }
 
 struct Meta {
-  doc "meta \"<namespace>\" key=value …"
+  doc "`meta \"<namespace>\" key=value …`."
   field namespace "string"
   field props "map<string,json>" optional=#true
 }
@@ -146,7 +146,7 @@ struct Key {
   field ty "Type"
   field default "json" optional=#true
   field validate "Validate" optional=#true
-  field number "u32" { doc "Protobuf field number in the block's <Block>Keys message." }
+  field number "u32" { doc "Protobuf field number in the block's `<Block>Keys` message." }
   field attrs "Attrs" default="{}"
   field span "Span"
 }
