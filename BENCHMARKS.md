@@ -1,97 +1,63 @@
 # Benchmarks
 
-`cargo bench -p korek-cli` ([benches/gen.rs](crates/korek-cli/benches/gen.rs))
-on a synthetic schema ([synthetic.rs](crates/korek-testkit/src/synthetic.rs)):
-2000 types (400 groups of an enum, two structs with 12 and 3 heavily
-validated fields, a tagged union and an untagged one; tagged unions chain 20
-deep), 500 keys in 50 blocks, 20 services with 100 RPCs; 660 KB of KDL in 18
-files. `full_gen` runs all five generators with outputs already up to date.
+```sh
+cargo bench -p korek-cli
+```
 
-Medians, release build, 32-core x86_64 Linux shared with other builds (load
-average 20–40 during the runs, so expect ±20%). "Before" is 0b6464e (the
-code before the performance work) with the same benchmark.
+[benches/gen.rs](crates/korek-cli/benches/gen.rs) runs on a synthetic schema
+([synthetic.rs](crates/korek-testkit/src/synthetic.rs)): 2000 types (400
+groups of an enum, two structs with 12 and 3 heavily validated fields, a
+tagged union and an untagged one; tagged unions chain 20 deep), 500 keys in
+50 blocks, 20 services with 100 RPCs; 660 KB of KDL in 18 files, or the same
+schema as one file. `full_gen` runs the rust, proto, zod, ts and jsonschema
+generators with their outputs already up to date.
 
-| Benchmark | Before | After | |
-|---|---:|---:|---|
-| load + validate, 18 files | 265 ms | 55 ms | 4.8× |
-| load + validate, one file | 254 ms | 232 ms | KDL parsing bound |
-| encode `GenerateRequest` (JSON) | 2.6 ms | 2.5 ms | |
-| generator `rust` | 14.2 ms | 12.3 ms | |
-| generator `proto` | 8.9 ms | 6.5 ms | |
-| generator `zod` | 7.8 ms | 2.8 ms | |
-| generator `ts` | 5.5 ms | 3.5 ms | |
-| generator `jsonschema` | 9.2 ms | 13.3 ms | noise (fastest 7.3 → 8.9 ms); unchanged code |
-| `korek gen`, builtin plugins | 392 ms | 155 ms | 2.5× |
-| `korek gen`, subprocess plugins | 396 ms | 196 ms | 2.0× |
-| `korek gen`, cache warm | — | 3.0 ms | 130× vs builtin |
+Release build on a 32-core x86_64 Linux host that was shared with other
+builds (load average 40–60), so expect ±20%; fastest / median of 30 samples
+(20 for `full_gen`):
 
-What changed:
+| Benchmark | Fastest | Median |
+|---|---:|---:|
+| `load_and_validate`, 18 files | 20.6 ms | 22.8 ms |
+| `load_and_validate`, one file | 38.7 ms | 44.5 ms |
+| `full_gen`, builtin plugins | 55.2 ms | 62.3 ms |
+| `full_gen`, subprocess plugins | 88.1 ms | 98.3 ms |
+| `full_gen`, cache warm | 2.75 ms | 2.89 ms |
 
-- **KDL files are parsed in parallel** (one thread per file); lowering stays
-  in file order. Parsing with the `kdl` crate is ~200 ms of the one-file
-  load, so a single huge file gains little: split large schemas.
-- **Type lookups are hashed** (`korek_ir::TypeIndex`, built once per pass)
-  in validation, default/example checking and the generators; `Schema::get`
-  was a linear scan, quadratic over a large schema.
-- **Regexes are compiled once** per pattern at load time (defaults,
-  examples and pattern validation), not per check.
-- Defaults and examples are placed into the IR in one pass (was a scan per
-  field).
+The `encode_request` and `generator` benches (medians from an earlier run on
+the same host; the generators have not changed since):
+
+| Benchmark | Median |
+|---|---:|
+| encode `GenerateRequest` (JSON) | 2.5 ms |
+| generator `rust` | 12.3 ms |
+| generator `proto` | 6.5 ms |
+| generator `zod` | 2.8 ms |
+| generator `ts` | 3.5 ms |
+| generator `jsonschema` | 13.3 ms (noisy; fastest 8.9 ms) |
+
+## What the numbers rest on
+
+- **Files are parsed in parallel**, one thread per file, with
+  [kdl-kit](https://github.com/talaagent/kdl-kit)'s `kdl-tree` parser;
+  lowering stays in file order. A one-file schema loads on one thread, so
+  splitting a large schema into files helps.
+- **Type lookups are hashed** (`korek_ir::TypeIndex`, built once per pass) in
+  validation, default/example checking and the generators.
+- **Regexes are compiled once** per pattern at load time (defaults, examples
+  and pattern validation), not per check.
 - Generator output buffers are sized from the schema up front.
 - **Input-hash cache** (`--cache-dir`, default `target/korek-cache` when
   `./target` exists): blake3 over the schema files, lockfile, extensions,
   the executable and plugin binaries (path, size, mtime), options and output
   directory. A plugin whose key matches and whose outputs are byte-identical
-  on disk is skipped; when all are, the schema is not even loaded.
+  on disk is skipped; when all are, the schema is not loaded.
+  `crates/korek-cli/tests/cli.rs` (`cache_skips_unchanged_runs`) tests the
+  hits and misses.
 - Generated Rust `validate()` does not allocate on valid values (a
-  counting-allocator test in `crates/korek-fixture/tests/alloc.rs`);
-  regexes are compiled once per call site (`OnceLock`). Generated Zod
-  schemas are module-level constants.
+  counting-allocator test, `crates/korek-fixture/tests/alloc.rs`); regexes
+  are compiled once per call site (`OnceLock`). Generated Zod schemas are
+  module-level constants.
 
-Not done: interning names (`Arc<str>`) and index-based type references in
-the IR — with the lookups hashed, generators are 3–13 ms for 2000 types and
-loading is dominated by KDL parsing, so the IR stays plain serde data.
-Profiling with perf/samply was not possible on the benchmark host
-(perf events are blocked); phases were timed with instrumentation instead
-(KDL parse ~230 ms, lowering ~50 ms, validation ~25 ms, numbering ~3 ms,
-before the changes on the one-file schema).
-
-## After kdl-load (kdl-serde 8bda293)
-
-Sources, listing and parsing moved to kdl-load/kdl-span/kdl-nodes, which
-needs `kdl` 6.7 (was 6.5.0; one copy, now 6.7.1). The host was even busier
-(load average 40–75), so each configuration was run twice, interleaved, on
-`load_and_validate`; fastest / median of 30 samples:
-
-| Configuration | 18 files | one file |
-|---|---:|---:|
-| before (fe19af7, kdl 6.5.0) | 65–82 / 137–167 ms | 239–247 / 312 ms |
-| before, kdl 6.7.1 only | 67–90 / 143–165 ms | 338–341 / 431–445 ms |
-| after (kdl-load, kdl 6.7.1) | 86–91 / 125–171 ms | 314–316 / 418–425 ms |
-
-The kdl-load switch itself is neutral (same parallel per-file parsing,
-spans unchanged). The one-file slowdown, ~35% fastest-to-fastest, comes
-from the `kdl` 6.5 → 6.7 parser and also hits kdl-serde; the 18-file load
-is within the noise. `full_gen` and the generators were not touched; their
-runs here differed by up to 2× between identical builds.
-
-## After kdl-tree (kdl-serde 922c43d)
-
-Parsing moved from the `kdl` crate to kdl-serde's own `kdl-tree` parser
-(kdl-load's `into_tree()`, `kdl-compat` off, so `kdl` is no longer built).
-Before (437e9ae) and after were run twice, interleaved, on a busy host
-(load average 40–60); fastest / median of 30 samples (20 for `full_gen`):
-
-| Benchmark | Before (kdl 6.7.1) | After (kdl-tree) |
-|---|---:|---:|
-| `load_and_validate`, 18 files | 62.6–85.3 / 66.1–150.6 ms | 20.6 / 22.7–22.8 ms |
-| `load_and_validate`, one file | 287.6–289.5 / 294.1–326.6 ms | 38.7–38.9 / 43.9–44.5 ms |
-| `full_gen` builtin | 170.4 / 177.9 ms | 55.2 / 62.3 ms |
-| `full_gen` subprocess | 200.2 / 206.1 ms | 88.1 / 98.3 ms |
-| `full_gen` cached | 2.75 / 2.86 ms | 2.75 / 2.89 ms |
-
-Loading is ~3× faster on 18 files and ~7× on one file: KDL parsing no longer
-dominates, so the one-file load (one thread) is now mostly lowering and
-validation. Diagnostics keep their codes and spans, except that a node's
-span no longer takes the whitespace before a closing `}`, and syntax errors
-carry kdl-tree's messages.
+The IR stays plain serde data (no interned names or index-based type
+references): with hashed lookups the generators take 3–13 ms for 2000 types.

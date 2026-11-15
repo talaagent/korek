@@ -20,7 +20,11 @@ protovalidate's standard rules keep their own messages). Defaults and
 A generator that cannot express a rule reports `korek::rule_unsupported` (a
 warning; `korek gen --strict` makes it an error). The shared vectors in
 `crates/korek-testkit/vectors/rules.json` run against the loader, the
-generated Rust and the generated Zod; they must all agree.
+generated Rust, the generated Zod and the generated Protobuf under
+protovalidate-es; they must all agree. They cover most rules but not yet all
+of them (not, for example, `cel`, the `*_now` and `within` time rules, or
+several string formats), and they do not run against the JSON Schema output:
+those cells of the table rest on the generators' unit and golden tests.
 
 ## Coverage
 
