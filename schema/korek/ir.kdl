@@ -1,7 +1,7 @@
 // The IR, in korek's own language: mirrors korek_ir::ir field for field.
 // The JSON form is the same as korek-ir's serde form (checked by
 // crates/korek-fixture/tests/selfhost.rs); the Rust types differ where korek
-// cannot say what korek-ir says (see "Self-hosting" in CLAUDE.md):
+// cannot say what korek-ir says (see "Self-hosting" in AGENTS.md):
 // - `#[serde(default, skip_serializing_if = …)]` fields are optional here
 //   (`Option<Vec<T>>` rather than `Vec<T>`, `Option<bool>` rather than `bool`);
 // - externally tagged enums (`Type`, `TypeKind`) are untagged unions of

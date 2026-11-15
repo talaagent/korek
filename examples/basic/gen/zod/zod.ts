@@ -44,7 +44,7 @@ export const GetResponseSchema = z.object({
 }) satisfies z.ZodType<GetResponse>;
 
 /** Which provider runs a turn. */
-export const BackendSchema = z.enum(["claude", "codex"]) satisfies z.ZodType<Backend>;
+export const BackendSchema = z.enum(["local", "remote"]) satisfies z.ZodType<Backend>;
 
 /**
  * An MCP server started as a child process.
@@ -96,7 +96,7 @@ export const keys: { [K in keyof Keys]-?: Key<Keys[K]> } = {
   },
   "session.backend": {
     schema: BackendSchema,
-    default: "claude",
+    default: "local",
     doc: "",
   },
   /** Turn timeout. */
@@ -125,23 +125,23 @@ export const keys: { [K in keyof Keys]-?: Key<Keys[K]> } = {
     doc: "Also known as: turns.max.",
   },
   /** @example {"files":{"type":"stdio","command":"mcp-files"}} */
-  "claude.mcp_servers": {
+  "provider.mcp_servers": {
     schema: z.record(z.string(), McpServerSchema),
     default: {},
     doc: "",
   },
   /** Model override; unset means the account default. */
-  "claude.model": {
+  "provider.model": {
     schema: z.string().regex(new RegExp("^[a-z0-9.-]+$")),
     doc: "Model override; unset means the account default.",
   },
-  "claude.api_key": {
+  "provider.api_key": {
     schema: z.string().refine((v) => [...v].length >= 20),
     doc: "",
     secret: true,
   },
   /** Sent with each request. */
-  "claude.metadata": {
+  "provider.metadata": {
     schema: z.json(),
     default: {"team":"core"},
     doc: "Sent with each request.",

@@ -45,8 +45,8 @@ Which provider runs a turn.
 
 | Variant | Description |
 |---|---|
-| `claude` | Claude Code. |
-| `codex` | OpenAI Codex. |
+| `local` | Runs on this machine. |
+| `remote` | Runs on a hosted service. |
 
 <a id="type.McpStdio"></a>
 

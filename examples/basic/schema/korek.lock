@@ -2,10 +2,10 @@
 // korek; commit it. Edit by hand only to renumber on purpose.
 version 1
 enum "Backend" {
-    item "claude" 1
-    item "codex" 2
+    item "local" 1
+    item "remote" 2
 }
-keys "claude" {
+keys "provider" {
     item "mcp_servers" 1
     item "model" 2
     item "api_key" 3

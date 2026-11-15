@@ -15,7 +15,7 @@
   - [`Contact`](#type.Contact): A person in the address book.
 - [Keys](#keys)
   - [`session`](#keys.session): Per-session settings.
-  - [`claude`](#keys.claude)
+  - [`provider`](#keys.provider)
 - [Services](#services)
   - [`ContactsService`](#service.ContactsService): Look up contacts.
 
@@ -64,8 +64,8 @@ Which provider runs a turn.
 
 | Variant | Description |
 |---|---|
-| `claude` | Claude Code. |
-| `codex` | OpenAI Codex. |
+| `local` | Runs on this machine. |
+| `remote` | Runs on a hosted service. |
 
 <a id="type.McpStdio"></a>
 
@@ -163,7 +163,7 @@ Per-session settings.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | [`session.steer.enabled`](#key.session.steer.enabled) | `bool` | `false` | Give a new message to the running turn. |
-| [`session.backend`](#key.session.backend) | [`Backend`](#type.Backend) | `"claude"` |  |
+| [`session.backend`](#key.session.backend) | [`Backend`](#type.Backend) | `"local"` |  |
 | [`session.timeout`](#key.session.timeout) | `duration` | `"600s"` (10 minutes) | Turn timeout. |
 | [`session.temperature`](#key.session.temperature) | `f64` | `0.7` |  |
 | [`session.turn_limit`](#key.session.turn_limit) | [`Limit`](#type.Limit) | `50` |  |
@@ -184,7 +184,7 @@ Give a new message to the running turn.
 #### `session.backend`
 
 - Type: [`Backend`](#type.Backend)
-- Default: `"claude"`
+- Default: `"local"`
 - Level: basic
 
 <a id="key.session.timeout"></a>
@@ -221,20 +221,20 @@ Turn timeout.
 - **Deprecated**: use turn_limit.
 - Also known as `turns.max`.
 
-<a id="keys.claude"></a>
+<a id="keys.provider"></a>
 
-### `claude` keys
+### `provider` keys
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| [`claude.mcp_servers`](#key.claude.mcp_servers) | `map<string,`[`McpServer`](#type.McpServer)`>` | `{}` |  |
-| [`claude.model`](#key.claude.model) | `string` |  | Model override; unset means the account default. |
-| [`claude.api_key`](#key.claude.api_key) | `string` |  | **Secret.** |
-| [`claude.metadata`](#key.claude.metadata) | `json` | `{"team":"core"}` | Sent with each request. |
+| [`provider.mcp_servers`](#key.provider.mcp_servers) | `map<string,`[`McpServer`](#type.McpServer)`>` | `{}` |  |
+| [`provider.model`](#key.provider.model) | `string` |  | Model override; unset means the account default. |
+| [`provider.api_key`](#key.provider.api_key) | `string` |  | **Secret.** |
+| [`provider.metadata`](#key.provider.metadata) | `json` | `{"team":"core"}` | Sent with each request. |
 
-<a id="key.claude.mcp_servers"></a>
+<a id="key.provider.mcp_servers"></a>
 
-#### `claude.mcp_servers`
+#### `provider.mcp_servers`
 
 - Type: `map<string,`[`McpServer`](#type.McpServer)`>`
 - Default: `{}`
@@ -250,26 +250,26 @@ Example:
 }
 ```
 
-<a id="key.claude.model"></a>
+<a id="key.provider.model"></a>
 
-#### `claude.model`
+#### `provider.model`
 
 Model override; unset means the account default.
 
 - Type: `string`
 - Rules: Matches `^[a-z0-9.-]+$`.
 
-<a id="key.claude.api_key"></a>
+<a id="key.provider.api_key"></a>
 
-#### `claude.api_key`
+#### `provider.api_key`
 
 - Type: `string`
 - Rules: At least 20 characters.
 - **Secret**: never printed or shown with its value.
 
-<a id="key.claude.metadata"></a>
+<a id="key.provider.metadata"></a>
 
-#### `claude.metadata`
+#### `provider.metadata`
 
 Sent with each request.
 

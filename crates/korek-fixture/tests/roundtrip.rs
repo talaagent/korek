@@ -49,8 +49,8 @@ fn untagged_union_and_enum() {
         Limit::Preset("max".into())
     );
     assert_eq!(
-        serde_json::to_value(Backend::Codex).unwrap(),
-        json!("codex")
+        serde_json::to_value(Backend::Remote).unwrap(),
+        json!("remote")
     );
 }
 
@@ -83,7 +83,7 @@ fn json_fields_hold_any_value() {
     assert_eq!(serde_json::from_value::<Contact>(v).unwrap(), c);
     assert_eq!(c.validate(), Ok(()));
     assert_eq!(
-        keys::CLAUDE_METADATA.default_value(),
+        keys::PROVIDER_METADATA.default_value(),
         Some(json!({"team": "core"}))
     );
 }
@@ -118,7 +118,7 @@ fn validate_reports_every_failure_with_paths() {
 #[test]
 #[allow(deprecated)]
 fn keys_carry_defaults_and_metadata() {
-    assert_eq!(keys::SESSION_BACKEND.default_value(), Some(Backend::Claude));
+    assert_eq!(keys::SESSION_BACKEND.default_value(), Some(Backend::Local));
     assert_eq!(
         keys::SESSION_TIMEOUT.default_value().as_deref(),
         Some("600s")
@@ -130,12 +130,12 @@ fn keys_carry_defaults_and_metadata() {
         keys::SESSION_TURN_LIMIT.default_value(),
         Some(Limit::Count(50))
     );
-    assert!(keys::CLAUDE_API_KEY.secret);
+    assert!(keys::PROVIDER_API_KEY.secret);
     assert_eq!(keys::SESSION_MAX_TURNS.deprecated, Some("use turn_limit"));
     let json: serde_json::Value =
-        serde_json::from_str(keys::CLAUDE_MCP_SERVERS.default_json.unwrap()).unwrap();
+        serde_json::from_str(keys::PROVIDER_MCP_SERVERS.default_json.unwrap()).unwrap();
     assert_eq!(
-        serde_json::to_value(keys::CLAUDE_MCP_SERVERS.default_value().unwrap()).unwrap(),
+        serde_json::to_value(keys::PROVIDER_MCP_SERVERS.default_value().unwrap()).unwrap(),
         json
     );
     assert_eq!(keys::ALL.len(), 10);

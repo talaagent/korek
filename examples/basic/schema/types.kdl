@@ -2,8 +2,8 @@ package "example.v1"
 
 enum Backend {
   doc "Which provider runs a turn."
-  variant claude { doc "Claude Code." }
-  variant codex { doc "OpenAI Codex." }
+  variant local { doc "Runs on this machine." }
+  variant remote { doc "Runs on a hosted service." }
 }
 
 struct McpStdio {

@@ -6,7 +6,7 @@ keys "session" {
     label "Steering"
     widget "toggle"
   }
-  key "backend" "Backend" default="claude" { level "basic" }
+  key "backend" "Backend" default="local" { level "basic" }
   key "timeout" "duration" default="600s" {
     doc "Turn timeout."
     validate { gte "1s"; lte "86400s" }
@@ -19,7 +19,7 @@ keys "session" {
   }
 }
 
-keys "claude" {
+keys "provider" {
   key "mcp_servers" "map<string,McpServer>" default="{}" {
     example #"{"files": {"type": "stdio", "command": "mcp-files"}}"#
   }

@@ -1,17 +1,19 @@
-# korek
+# korek: contributor and agent guide
 
-Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zod, TS).
+Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zod, TypeScript, JSON Schema,
+markdown docs). This file is the reference for conventions; [CONTRIBUTING.md](CONTRIBUTING.md) covers
+the pull request flow and releases.
 
 ## Layout
 
 - `crates/korek-ir`: the IR (`ir.rs`) and plugin protocol (`protocol.rs`) as pure serde data (no logic;
   helpers in `impls.rs`), diagnostic codes (`codes.rs`, mirrored by `docs/errors.md`), typed values.
 - `crates/korek-core`: parse (`parse.rs`), validation (`validate.rs`), rule evaluation for defaults and
-  examples (`check.rs`), lockfile numbering (`lock.rs`), extensions (`ext.rs`), sources (`source.rs`: `Sources`
-  wraps kdl-span's `SourceMap`; listing and KDL parsing into kdl-tree documents via kdl-load, kdl-nodes for
-  child walking; all from talaagent/kdl-serde by git rev in `[workspace.dependencies]`, with `kdl-compat` off so
-  the `kdl` crate is not in the tree), diagnostics (`diag.rs`; miette only behind `miette`). `syntax.rs` is the
-  only module that names the KDL tree types (parsing, `Node`, literals). Keep it that way.
+  examples (`check.rs`), lockfile numbering (`lock.rs`), extensions (`ext.rs`), sources (`source.rs`:
+  `Sources` wraps kdl-span's `SourceMap`; files are listed and parsed into kdl-tree documents by kdl-load,
+  and child nodes are walked with kdl-nodes; all from [kdl-kit](https://github.com/talaagent/kdl-kit)),
+  diagnostics (`diag.rs`; miette only behind `miette`). `syntax.rs` is the only module that names the KDL
+  tree types (parsing, `Node`, literals). Keep it that way.
 - `crates/korek-plugin`: `run`, `Encoding`, `Hook`; depends on korek-ir only.
 - `crates/korek-gen-common`: shared generator helpers. `crates/korek-gen-{rust,proto,zod,ts,jsonschema,docs}`:
   `generate(&schema, &opts, hooks)` and `plugin(&req)`. Zod builds on the TS crate.
@@ -20,22 +22,29 @@ Schema files (KDL v2) → validated IR → generator plugins (Rust, Protobuf, Zo
   the generators) and the `korek-gen-*` binaries (`src/bin/`, so tests get `CARGO_BIN_EXE_*`).
 - `crates/korek-testkit`: shared rule vectors (`vectors/rules.json`) run against the loader, generated Rust
   (build script), generated Zod (`ts/vectors.test.ts`) and generated Protobuf under protovalidate-es
-  (`ts/protovalidate.test.ts`, descriptors from `buf build` of `gen/proto`).
-- `crates/korek-fixture`: `include!`s the generated Rust for `examples/basic` so it is compiled and tested;
-  its `build.rs` also generates `schema/korek` (see Self-hosting).
+  (`ts/protovalidate.test.ts`, descriptors from `buf build` of `gen/proto`); also the synthetic schema the
+  benchmarks use.
+- `crates/korek-fixture` (not published): `include!`s the generated Rust for `examples/basic` so it is
+  compiled and tested; its `build.rs` also generates Rust from `schema/korek` (see Self-hosting).
 - `schema/korek`: korek's own IR (`ir.kdl`) and plugin protocol (`protocol.kdl`) as a korek schema.
-- `examples/basic`: the example schema; `gen/` holds the golden outputs (`crates/korek/tests/golden.rs`).
-- `examples/plugin-example`: a third-party plugin and a driver test for it.
-- `ts/`: `bun test` for the Zod output (root `package.json`, `tsconfig.json`).
+- `examples/basic`: the example schema; `gen/` holds the golden outputs (`crates/korek-cli/tests/golden.rs`).
+- `examples/plugin-example` (not published): a third-party plugin and a driver test for it.
+- `ts/`: `bun test` for the Zod and Protobuf output (root `package.json`, `tsconfig.json`; not an npm
+  package).
 
-## Gate
+## Checks
+
+Run inside the nix dev shell (pinned toolchain from `rust-toolchain.toml`, bun, buf, protoc,
+cargo-nextest, cargo-deny). CI runs the same commands; every commit should pass them.
 
 ```sh
 nix develop -c cargo fmt --all --check
-nix develop -c cargo clippy --workspace --all-targets -- -D warnings
-nix develop -c cargo test --workspace
-nix develop -c cargo test -p korek-core --features miette
-nix develop -c sh -c 'bun install && bun test && bun run typecheck'
+nix develop -c cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+nix develop -c cargo nextest run --workspace --all-targets --locked
+nix develop -c cargo test --workspace --doc --locked
+nix develop -c cargo test -p korek-core --features miette --locked
+nix develop -c sh -c 'bun install --frozen-lockfile && bun test && bun run typecheck'
+nix develop -c cargo deny check
 ```
 
 ## Conventions
@@ -48,7 +57,7 @@ nix develop -c sh -c 'bun install && bun test && bun run typecheck'
   lists, maps, optionals, primitives), so they can later be generated from `schema/korek`.
 - Library crates use `thiserror`; `anyhow` only in the CLI and tests. No miette in korek-ir/korek-plugin.
 - KDL written back by korek (none yet; a future `korek fmt`) must keep `"""` multiline strings as written
-  (kdl-rs collapses them, kdl-org/kdl-rs#77); use kdl-serde's `kdl-pretty` and test the round trip.
+  (kdl-rs collapses them, kdl-org/kdl-rs#77); use kdl-kit's `kdl-pretty` and test the round trip.
 - IR changes are protocol changes: keep structs `#[non_exhaustive]`, add fields with serde defaults,
   bump `korek_plugin::PROTOCOL_VERSION` on breaking ones.
 - Every diagnostic has a stable `korek::<code>` and a span when there is a source location; add a test
@@ -60,6 +69,8 @@ nix develop -c sh -c 'bun install && bun test && bun run typecheck'
 - No "kdl" in crate, binary or module names; KDL is only the input format.
 - Changing an IR or protocol type means changing `schema/korek` too; `crates/korek-fixture/tests/selfhost.rs`
   fails when they disagree (new `RuleKind`s also go in its `every_rule()`).
+- No `unwrap` outside tests, `core`/`alloc` paths over `std` where they exist, no `unsafe` (the workspace
+  lints enforce all three).
 
 ## Self-hosting
 
@@ -80,13 +91,7 @@ Where korek cannot say what korek-ir says, the schema uses the closest form with
 - `Box`, `Copy`/`Eq`/`Hash` derives, `#[non_exhaustive]` and the hand-written helpers (`impls.rs`) have no
   counterpart.
 
-Bootstrap plan, to replace the hand-written types:
-
-1. Close the gaps above: recursive types (Rust `Box` on cycles, Zod `z.lazy`), a "default, omitted when
-   default" field mode, and externally tagged unions (or accept the untagged form in the IR).
-2. Generate `korek-ir`'s types from `schema/korek` with korek-gen-rust and diff them against `ir.rs`/
-   `protocol.rs` (the round-trip test keeps the JSON in step meanwhile).
-3. Swap: `korek-ir` `include!`s a checked-in generated copy (`crates/korek-ir/src/generated.rs`), keeping
-   `impls.rs`; a test regenerates it and fails on a diff (like the goldens, blessed with `KOREK_BLESS=1`).
-4. The checked-in copy is the bootstrap: korek builds from it, never from its own output at build time, so a
-   broken generator cannot break its own build; regenerate and review the diff when the schema changes.
+The goal is to generate korek-ir's types from `schema/korek`: close the gaps above (recursive types, a
+"default, omitted when default" field mode, externally tagged unions), then have `korek-ir` `include!` a
+checked-in generated copy, kept fresh by a test like the goldens. korek always builds from the checked-in
+copy, never from its own output at build time, so a broken generator cannot break its own build.

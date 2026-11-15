@@ -9,7 +9,7 @@ Per-session settings.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | [`session.steer.enabled`](keys.session.md#key.session.steer.enabled) | `bool` | `false` | Give a new message to the running turn. |
-| [`session.backend`](keys.session.md#key.session.backend) | [`Backend`](types.md#type.Backend) | `"claude"` |  |
+| [`session.backend`](keys.session.md#key.session.backend) | [`Backend`](types.md#type.Backend) | `"local"` |  |
 | [`session.timeout`](keys.session.md#key.session.timeout) | `duration` | `"600s"` (10 minutes) | Turn timeout. |
 | [`session.temperature`](keys.session.md#key.session.temperature) | `f64` | `0.7` |  |
 | [`session.turn_limit`](keys.session.md#key.session.turn_limit) | [`Limit`](types.md#type.Limit) | `50` |  |
@@ -30,7 +30,7 @@ Give a new message to the running turn.
 ## `session.backend`
 
 - Type: [`Backend`](types.md#type.Backend)
-- Default: `"claude"`
+- Default: `"local"`
 - Level: basic
 
 <a id="key.session.timeout"></a>

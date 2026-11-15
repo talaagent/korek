@@ -4,7 +4,7 @@ use crate::Types;
 use crate::ir::{Field, Json, Type, TypeKind};
 
 /// A JSON value matched to its type, so generators can write literals
-/// (`Backend::Claude`, `McpStdio { .. }`) without re-deriving union
+/// (`Backend::Local`, `McpStdio { .. }`) without re-deriving union
 /// variants.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]

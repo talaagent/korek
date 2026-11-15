@@ -97,12 +97,12 @@ impl ::korek_runtime::Validate for GetResponse {
 /// Which provider runs a turn.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, ::serde::Serialize, ::serde::Deserialize)]
 pub enum Backend {
-    /// Claude Code.
-    #[serde(rename = "claude")]
-    Claude,
-    /// OpenAI Codex.
-    #[serde(rename = "codex")]
-    Codex,
+    /// Runs on this machine.
+    #[serde(rename = "local")]
+    Local,
+    /// Runs on a hosted service.
+    #[serde(rename = "remote")]
+    Remote,
 }
 
 #[allow(clippy::all, clippy::pedantic)]
@@ -404,8 +404,8 @@ pub mod keys {
         name: "backend",
         path: "session.backend",
         doc: "",
-        default: Some(|| Backend::Claude),
-        default_json: Some("\"claude\""),
+        default: Some(|| Backend::Local),
+        default_json: Some("\"local\""),
         secret: false,
         deprecated: None,
         unit: None,
@@ -498,19 +498,19 @@ pub mod keys {
         check: check_session_max_turns,
     };
 
-    // `claude` keys.
+    // `provider` keys.
 
-    fn check_claude_mcp_servers(v: &::std::collections::BTreeMap<String, McpServer>, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
+    fn check_provider_mcp_servers(v: &::std::collections::BTreeMap<String, McpServer>, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
         let _ = (v, path, errors);
     }
 
     /// Examples:
     ///
     /// - `{"files":{"type":"stdio","command":"mcp-files"}}`
-    pub const CLAUDE_MCP_SERVERS: ::korek_runtime::Key<::std::collections::BTreeMap<String, McpServer>> = ::korek_runtime::Key {
-        group: "claude",
+    pub const PROVIDER_MCP_SERVERS: ::korek_runtime::Key<::std::collections::BTreeMap<String, McpServer>> = ::korek_runtime::Key {
+        group: "provider",
         name: "mcp_servers",
-        path: "claude.mcp_servers",
+        path: "provider.mcp_servers",
         doc: "",
         default: Some(|| ::std::collections::BTreeMap::new()),
         default_json: Some("{}"),
@@ -518,20 +518,20 @@ pub mod keys {
         deprecated: None,
         unit: None,
         rules: &[],
-        check: check_claude_mcp_servers,
+        check: check_provider_mcp_servers,
     };
 
-    fn check_claude_model(v: &String, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
+    fn check_provider_model(v: &String, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
         if { static RE: ::std::sync::OnceLock<::korek_runtime::regex::Regex> = ::std::sync::OnceLock::new(); !::korek_runtime::matches(&RE, "^[a-z0-9.-]+$", &v.as_str()) } {
             errors.push(&path, "pattern", "must match \"^[a-z0-9.-]+$\"");
         }
     }
 
     /// Model override; unset means the account default.
-    pub const CLAUDE_MODEL: ::korek_runtime::Key<String> = ::korek_runtime::Key {
-        group: "claude",
+    pub const PROVIDER_MODEL: ::korek_runtime::Key<String> = ::korek_runtime::Key {
+        group: "provider",
         name: "model",
-        path: "claude.model",
+        path: "provider.model",
         doc: "Model override; unset means the account default.",
         default: None,
         default_json: None,
@@ -539,19 +539,19 @@ pub mod keys {
         deprecated: None,
         unit: None,
         rules: &[::korek_runtime::RuleInfo { name: "pattern", operand: "\"^[a-z0-9.-]+$\"" }],
-        check: check_claude_model,
+        check: check_provider_model,
     };
 
-    fn check_claude_api_key(v: &String, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
+    fn check_provider_api_key(v: &String, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
         if v.chars().count() < 20 {
             errors.push(&path, "min_len", "length must be at least 20");
         }
     }
 
-    pub const CLAUDE_API_KEY: ::korek_runtime::Key<String> = ::korek_runtime::Key {
-        group: "claude",
+    pub const PROVIDER_API_KEY: ::korek_runtime::Key<String> = ::korek_runtime::Key {
+        group: "provider",
         name: "api_key",
-        path: "claude.api_key",
+        path: "provider.api_key",
         doc: "",
         default: None,
         default_json: None,
@@ -559,18 +559,18 @@ pub mod keys {
         deprecated: None,
         unit: None,
         rules: &[::korek_runtime::RuleInfo { name: "min_len", operand: "20" }],
-        check: check_claude_api_key,
+        check: check_provider_api_key,
     };
 
-    fn check_claude_metadata(v: &::korek_runtime::serde_json::Value, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
+    fn check_provider_metadata(v: &::korek_runtime::serde_json::Value, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
         let _ = (v, path, errors);
     }
 
     /// Sent with each request.
-    pub const CLAUDE_METADATA: ::korek_runtime::Key<::korek_runtime::serde_json::Value> = ::korek_runtime::Key {
-        group: "claude",
+    pub const PROVIDER_METADATA: ::korek_runtime::Key<::korek_runtime::serde_json::Value> = ::korek_runtime::Key {
+        group: "provider",
         name: "metadata",
-        path: "claude.metadata",
+        path: "provider.metadata",
         doc: "Sent with each request.",
         default: Some(|| ::korek_runtime::serde_json::from_str::<::korek_runtime::serde_json::Value>("{\"team\":\"core\"}").expect("valid JSON")),
         default_json: Some("{\"team\":\"core\"}"),
@@ -578,9 +578,9 @@ pub mod keys {
         deprecated: None,
         unit: None,
         rules: &[],
-        check: check_claude_metadata,
+        check: check_provider_metadata,
     };
 
     /// Every key's full name.
-    pub const ALL: &[&str] = &["session.steer.enabled", "session.backend", "session.timeout", "session.temperature", "session.turn_limit", "session.max_turns", "claude.mcp_servers", "claude.model", "claude.api_key", "claude.metadata"];
+    pub const ALL: &[&str] = &["session.steer.enabled", "session.backend", "session.timeout", "session.temperature", "session.turn_limit", "session.max_turns", "provider.mcp_servers", "provider.model", "provider.api_key", "provider.metadata"];
 }

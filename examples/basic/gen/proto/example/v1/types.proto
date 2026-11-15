@@ -29,10 +29,10 @@ message GetResponse {
 // Which provider runs a turn.
 enum Backend {
   BACKEND_UNSPECIFIED = 0;
-  // Claude Code.
-  BACKEND_CLAUDE = 1;
-  // OpenAI Codex.
-  BACKEND_CODEX = 2;
+  // Runs on this machine.
+  BACKEND_LOCAL = 1;
+  // Runs on a hosted service.
+  BACKEND_REMOTE = 2;
 }
 
 // An MCP server started as a child process.
@@ -94,7 +94,7 @@ message SessionKeys {
   //
   // Default: false
   optional bool steer_enabled = 1;
-  // Default: "claude"
+  // Default: "local"
   optional Backend backend = 2;
   // Turn timeout.
   //
@@ -109,7 +109,7 @@ message SessionKeys {
   optional uint32 max_turns = 6;
 }
 
-message ClaudeKeys {
+message ProviderKeys {
   // Default: {}
   map<string, McpServer> mcp_servers = 1;
   // Model override; unset means the account default.

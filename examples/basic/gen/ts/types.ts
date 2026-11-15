@@ -25,7 +25,7 @@ export interface GetResponse {
 }
 
 /** Which provider runs a turn. */
-export type Backend = "claude" | "codex";
+export type Backend = "local" | "remote";
 
 /**
  * An MCP server started as a child process.
@@ -129,7 +129,7 @@ export interface Keys {
    * @default false
    */
   "session.steer.enabled": boolean;
-  /** @default "claude" */
+  /** @default "local" */
   "session.backend": Backend;
   /**
    * Turn timeout.
@@ -152,37 +152,37 @@ export interface Keys {
    * @default 20
    */
   "session.max_turns": number;
-  // `claude` keys.
+  // `provider` keys.
   /**
    * @example {"files":{"type":"stdio","command":"mcp-files"}}
    * @default {}
    */
-  "claude.mcp_servers": Record<string, McpServer>;
+  "provider.mcp_servers": Record<string, McpServer>;
   /**
    * Model override; unset means the account default.
    * @validate pattern "^[a-z0-9.-]+$"
    */
-  "claude.model": string;
+  "provider.model": string;
   /**
    * @validate min_len 20
    * @secret
    */
-  "claude.api_key": string;
+  "provider.api_key": string;
   /**
    * Sent with each request.
    * @default {"team":"core"}
    */
-  "claude.metadata": unknown;
+  "provider.metadata": unknown;
 }
 
 /** The defaults of the keys that have one. */
 export const keyDefaults: Partial<Keys> = {
   "session.steer.enabled": false,
-  "session.backend": "claude",
+  "session.backend": "local",
   "session.timeout": "600s",
   "session.temperature": 0.7,
   "session.turn_limit": 50,
   "session.max_turns": 20,
-  "claude.mcp_servers": {},
-  "claude.metadata": {"team":"core"},
+  "provider.mcp_servers": {},
+  "provider.metadata": {"team":"core"},
 };

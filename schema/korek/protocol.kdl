@@ -1,5 +1,5 @@
 // The plugin protocol, in korek's own language: mirrors korek_ir::protocol
-// (the IR is in ir.kdl). See "Self-hosting" in CLAUDE.md.
+// (the IR is in ir.kdl). See "Self-hosting" in AGENTS.md.
 package "korek.v1"
 
 struct GenerateRequest {

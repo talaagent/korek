@@ -68,8 +68,8 @@
     "Backend": {
       "type": "string",
       "enum": [
-        "claude",
-        "codex"
+        "local",
+        "remote"
       ],
       "description": "Which provider runs a turn."
     },
@@ -265,7 +265,7 @@
         },
         "session.backend": {
           "$ref": "#/$defs/Backend",
-          "default": "claude"
+          "default": "local"
         },
         "session.timeout": {
           "type": "string",
@@ -291,7 +291,7 @@
           "deprecated": true,
           "default": 20
         },
-        "claude.mcp_servers": {
+        "provider.mcp_servers": {
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/McpServer"
@@ -306,17 +306,17 @@
           ],
           "default": {}
         },
-        "claude.model": {
+        "provider.model": {
           "type": "string",
           "pattern": "^[a-z0-9.-]+$",
           "description": "Model override; unset means the account default."
         },
-        "claude.api_key": {
+        "provider.api_key": {
           "type": "string",
           "minLength": 20,
           "writeOnly": true
         },
-        "claude.metadata": {
+        "provider.metadata": {
           "description": "Sent with each request.",
           "default": {
             "team": "core"

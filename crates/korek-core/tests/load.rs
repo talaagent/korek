@@ -49,9 +49,9 @@ fn loads_the_example() {
     assert_eq!(session.keys[3].default, Some(serde_json::json!(0.7)));
     let t = s.get("McpStdio").unwrap();
     assert_eq!(t.attrs.examples.len(), 1);
-    let claude = &s.keys[1];
-    assert!(claude.keys[2].attrs.secret);
-    assert_eq!(claude.keys[2].attrs.meta[0].namespace, "acme.ui");
+    let provider = &s.keys[1];
+    assert!(provider.keys[2].attrs.secret);
+    assert_eq!(provider.keys[2].attrs.meta[0].namespace, "acme.ui");
     assert_eq!(s.services[0].rpcs.len(), 2);
 }
 

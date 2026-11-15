@@ -15,6 +15,6 @@
   - [`Contact`](types.md#type.Contact): A person in the address book.
 - [Keys](keys.session.md)
   - [`session`](keys.session.md#keys.session): Per-session settings.
-  - [`claude`](keys.claude.md#keys.claude)
+  - [`provider`](keys.provider.md#keys.provider)
 - [Services](services.md)
   - [`ContactsService`](services.md#service.ContactsService): Look up contacts.

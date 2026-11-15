@@ -58,7 +58,7 @@ test("key defaults parse with their schemas", () => {
     }
   }
   expect(keys["session.timeout"].schema.safeParse("0.5s").success).toBe(false);
-  expect(keys["claude.api_key"].secret).toBe(true);
+  expect(keys["provider.api_key"].secret).toBe(true);
   const d: Partial<Bare.Keys> = keyDefaults;
-  expect(d["session.backend"]).toBe("claude");
+  expect(d["session.backend"]).toBe("local");
 });

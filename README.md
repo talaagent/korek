@@ -68,8 +68,8 @@ package "example.v1"
 
 enum Backend {
   doc "Which provider runs a turn."
-  variant claude { doc "Claude Code." }
-  variant codex { doc "OpenAI Codex." }
+  variant local { doc "Runs on this machine." }
+  variant remote { doc "Runs on a hosted service." }
 }
 
 struct McpHttp {
@@ -102,7 +102,7 @@ keys "session" {
   key "max_turns" "u32" default=20 { deprecated "use turn_limit"; alias "turns.max" }
 }
 
-keys "claude" {
+keys "provider" {
   key "mcp_servers" "map<string,McpServer>" default="{}"
   key "api_key" "string" { secret; validate { min_len 20 }; meta "acme.ui" widget="password" }
 }
