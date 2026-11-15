@@ -307,10 +307,16 @@ impl Driver {
                     format!("running {}: {e}", path.display()),
                 )
             })?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(&input)
-                .map_err(|e| fail(codes::PLUGIN_FAILED, format!("writing the request: {e}")))?;
+        // A plugin that exits without reading the request closes the pipe;
+        // its exit status and stderr below say why, so EPIPE is not the error.
+        if let Some(mut stdin) = child.stdin.take()
+            && let Err(e) = stdin.write_all(&input)
+            && e.kind() != std::io::ErrorKind::BrokenPipe
+        {
+            return Err(fail(
+                codes::PLUGIN_FAILED,
+                format!("writing the request: {e}"),
+            ));
         }
         let res = child.wait_with_output().map_err(|e| {
             fail(
