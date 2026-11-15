@@ -65,12 +65,13 @@ built-in token.
 
 Each crate trusts GitHub owner `talaagent`, repository `korek`, workflow
 `release-plz.yml`, no environment. The publishing job has `id-token: write`;
-release-plz performs the OIDC exchange itself. Do not set
-`CARGO_REGISTRY_TOKEN` in that job: a persistent token overrides OIDC.
+release-plz performs the OIDC exchange itself. Only the bootstrap step reads
+the `CARGO_REGISTRY_TOKEN` secret; delete it after the first publication, as
+a persistent token overrides OIDC.
 
 A crate's first publication needs a short-lived crates.io token with
-`publish-new`; trusted publishing cannot create a crate. For the initial
-rollout, dispatch the release workflow with `bootstrap=true`; it publishes
+`publish-new`, stored as the `CARGO_REGISTRY_TOKEN` Actions secret; trusted
+publishing cannot create a crate. For the initial rollout, dispatch the release workflow with `bootstrap=true`; it publishes
 the committed versions. `release_packages` optionally selects a
 comma-separated subset so dependencies can go first (korek-ir, korek-runtime,
 korek-plugin, korek-gen-common, then the generators and korek-core, then

@@ -126,8 +126,17 @@ jobs:
         env:
           RELEASE_PACKAGES: ${{ inputs.release_packages }}
         run: python3 scripts/prepare-manual-release "$RUNNER_TEMP/release-plz-manual.toml"
+      # Normal releases: OIDC trusted publishing, no registry secret.
       - name: release-plz release
-        run: nix develop --command release-plz release --git-token "$GITHUB_TOKEN" --config "$RELEASE_CONFIG"
+        if: ${{ !inputs.bootstrap }}
+        run: nix develop --command release-plz release --git-token "$GITHUB_TOKEN" --config release-plz.toml
         env:
-          RELEASE_CONFIG: ${{ inputs.bootstrap && format('{0}/release-plz-manual.toml', runner.temp) || 'release-plz.toml' }}
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+      # Bootstrap: brand-new crates cannot use trusted publishing yet, so this
+      # path uses the short-lived CARGO_REGISTRY_TOKEN secret when it is set.
+      - name: release-plz release (bootstrap)
+        if: inputs.bootstrap
+        run: nix develop --command release-plz release --git-token "$GITHUB_TOKEN" --config "$RUNNER_TEMP/release-plz-manual.toml"
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
