@@ -1,35 +1,177 @@
-name: ci
+# CI: fmt, clippy, tests, MSRV, docs, cargo-deny, packaging, the TypeScript
+# checks on the generated Zod/Protobuf, generated-file drift and the nix
+# package and dev shell.
+
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # rust-toolchain.toml's channel; the nix dev shell uses the same file.
+  RUST_TOOLCHAIN: stable
 
 jobs:
-  check:
-    # Off while the repo is private (no Actions minutes); on once public.
-    if: ${{ !github.event.repository.private }}
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+  test:
+    name: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      # The suite runs buf and protoc on the generated Protobuf, so it runs
+      # in the dev shell (which also has cargo-nextest).
       - uses: cachix/install-nix-action@v31
       - uses: Swatinem/rust-cache@v2
-      - name: fmt
-        run: nix develop -c cargo fmt --all --check
-      - name: clippy
-        run: nix develop -c cargo clippy --workspace --all-targets -- -D warnings
-      - name: test
-        run: nix develop -c cargo test --workspace
+      - run: nix develop -c cargo nextest run --profile ci --workspace --all-targets --locked
+      # The READMEs' and crate docs' examples.
+      - run: nix develop -c cargo test --workspace --doc --locked
       - name: test with miette rendering
-        run: nix develop -c cargo test -p korek-core --features miette
+        run: nix develop -c cargo nextest run --profile ci -p korek-core --features miette --locked
       - name: build without builtin generators
-        run: nix develop -c cargo build -p korek-cli --no-default-features
-      - name: generated files are fresh
-        run: nix develop -c cargo run -q -p korek-cli -- gen --check --rust examples/basic/gen/rust --proto examples/basic/gen/proto --zod examples/basic/gen/zod --ts examples/basic/gen/ts --jsonschema examples/basic/gen/jsonschema --docs examples/basic/gen/docs examples/basic/schema
-      - name: bun test
-        run: nix develop -c sh -c 'bun install --frozen-lockfile && bun test && bun run typecheck'
+        run: nix develop -c cargo build -p korek-cli --no-default-features --locked
+
+  typescript:
+    name: TypeScript (generated Zod and Protobuf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop -c bun install --frozen-lockfile
+      # ts/vectors.test.ts and ts/protovalidate.test.ts run the shared rule
+      # vectors against the generated Zod and, through buf, protovalidate-es.
+      - run: nix develop -c bun test
+      - run: nix develop -c bun run typecheck
+
+  generated:
+    name: generated files are fresh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      # The golden test (crates/korek-cli/tests/golden.rs) covers every
+      # option variant; this is the CLI's own --check on the example.
+      - run: >-
+          cargo run -q --locked -p korek-cli -- gen --check
+          --rust examples/basic/gen/rust --proto examples/basic/gen/proto
+          --zod examples/basic/gen/zod --ts examples/basic/gen/ts
+          --jsonschema examples/basic/gen/jsonschema --docs examples/basic/gen/docs
+          examples/basic/schema
+
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read rust-version from Cargo.toml
+        id: msrv
+        run: |
+          msrv=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["rust-version"])')
+          echo "MSRV: $msrv"
+          echo "version=$msrv" >> "$GITHUB_OUTPUT"
+      # Re-resolve Cargo.lock with a current cargo, whose rust-version-aware
+      # resolver (resolver 3) picks dependency versions that still build on
+      # the MSRV.
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - run: cargo generate-lockfile
+      # dtolnay/rust-toolchain master @ 2026-10-16; installs the MSRV (rust-version)
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +${{ steps.msrv.outputs.version }} build --workspace --locked
+
+  doc:
+    name: docs
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo doc --workspace --no-deps --all-features --locked
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Licenses (permissive only), advisories, bans and sources: see
+      # deny.toml.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  package:
+    name: package verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      # The excluded crates depend on kdl-load/kdl-nodes/kdl-span, which are
+      # git dependencies until kdl-kit is on crates.io. Drop the excludes
+      # then.
+      - run: >-
+          cargo publish --workspace --dry-run --locked
+          --exclude korek-core --exclude korek --exclude korek-cli
+          --exclude korek-gen-docs --exclude korek-gen-proto --exclude korek-testkit
+
+  nix:
+    name: Nix package and dev shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - run: nix flake check -L
+      - run: nix build -L
+      - run: nix develop --command cargo nextest --version
