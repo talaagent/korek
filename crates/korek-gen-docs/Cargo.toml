@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-docs"
-description = "korek's markdown reference docs generator"
+description = "korek's markdown reference docs generator for schemas: types, keys, rules in words"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-docs"
+readme = "README.md"
+keywords = ["markdown", "documentation", "codegen", "schema"]
+categories = ["development-tools"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

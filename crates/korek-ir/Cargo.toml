@@ -1,13 +1,17 @@
 [package]
 name = "korek-ir"
-description = "korek's intermediate representation and plugin protocol types: pure data"
+description = "korek's schema IR and generator plugin protocol types: plain serde data"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-ir"
+readme = "README.md"
+keywords = ["schema", "codegen", "ir", "plugin", "protocol"]
+categories = ["development-tools", "encoding"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

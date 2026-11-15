@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-ts"
-description = "korek's bare TypeScript generator: types with no runtime dependency"
+description = "korek's TypeScript code generator: types with no runtime dependency"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-ts"
+readme = "README.md"
+keywords = ["typescript", "codegen", "types", "schema"]
+categories = ["development-tools::build-utils"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

@@ -91,7 +91,7 @@ struct S{i} {{
   field id "string" {{ validate {{ uuid }} }}
 "#
     );
-    if i % DEPTH != 0 {
+    if !i.is_multiple_of(DEPTH) {
         let _ = writeln!(s, "  field next \"U{}\" optional=#true", i - 1);
     }
     let _ = write!(

@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-rust"
-description = "korek's Rust generator: serde types, validate() and typed key consts"
+description = "korek's Rust code generator: serde types, validate() per type, Defaults and typed key consts"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-rust"
+readme = "README.md"
+keywords = ["codegen", "rust", "serde", "validation", "schema"]
+categories = ["development-tools::build-utils"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

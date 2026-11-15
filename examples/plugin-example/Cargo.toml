@@ -4,6 +4,7 @@ description = "An example third-party korek plugin"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
 publish = false
 
 [lints]
@@ -14,5 +15,5 @@ korek-plugin.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
-korek = { workspace = true, default-features = false }
+korek.workspace = true
 tempfile.workspace = true

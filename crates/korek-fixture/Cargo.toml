@@ -4,6 +4,7 @@ description = "Compiles and exercises the Rust that korek generates for the exam
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
 publish = false
 
 [lints]

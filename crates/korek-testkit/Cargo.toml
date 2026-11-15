@@ -1,13 +1,17 @@
 [package]
 name = "korek-testkit"
-description = "Shared validation test vectors for korek generators, and a conformance runner"
+description = "Shared validation test vectors and a conformance runner for korek code generators"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-testkit"
+readme = "README.md"
+keywords = ["testing", "codegen", "validation", "schema"]
+categories = ["development-tools::testing"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

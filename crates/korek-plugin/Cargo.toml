@@ -1,13 +1,17 @@
 [package]
 name = "korek-plugin"
-description = "The korek generator plugin protocol: run helper, encoding and hooks (no parser dependency)"
+description = "Write korek code generator plugins: the JSON plugin protocol, run helper and hooks (no parser dependency)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-plugin"
+readme = "README.md"
+keywords = ["codegen", "plugin", "schema", "protocol"]
+categories = ["development-tools"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

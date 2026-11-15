@@ -1,13 +1,17 @@
 [package]
 name = "korek-cli"
-description = "The korek CLI: load a schema and run generator plugins"
+description = "Schema-first code generator CLI: KDL schemas to Rust, Protobuf (protovalidate), Zod, TypeScript, JSON Schema and docs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-cli"
+readme = "README.md"
+keywords = ["schema", "codegen", "protobuf", "zod", "typescript"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
 rust-version.workspace = true
-publish.workspace = true
 default-run = "korek"
 
 [lints]
@@ -19,38 +23,48 @@ default = ["builtin"]
 # `korek-gen-<name>` on PATH or `--plugin` still overrides them).
 builtin = ["korek/generators"]
 
+[lib]
+path = "src/lib.rs"
+
 [[bin]]
 name = "korek"
 path = "src/main.rs"
+doc = false
 
 [[bin]]
 name = "korek-gen-rust"
 path = "src/bin/korek-gen-rust.rs"
+doc = false
 
 [[bin]]
 name = "korek-gen-proto"
 path = "src/bin/korek-gen-proto.rs"
+doc = false
 
 [[bin]]
 name = "korek-gen-zod"
 path = "src/bin/korek-gen-zod.rs"
+doc = false
 
 [[bin]]
 name = "korek-gen-ts"
 path = "src/bin/korek-gen-ts.rs"
+doc = false
 
 [[bin]]
 name = "korek-gen-jsonschema"
 path = "src/bin/korek-gen-jsonschema.rs"
+doc = false
 
 [[bin]]
 name = "korek-gen-docs"
 path = "src/bin/korek-gen-docs.rs"
+doc = false
 
 [dependencies]
 anyhow.workspace = true
 bpaf.workspace = true
-korek = { workspace = true, default-features = false, features = ["miette"] }
+korek = { workspace = true, features = ["miette"] }
 korek-gen-docs.workspace = true
 korek-gen-jsonschema.workspace = true
 korek-gen-proto.workspace = true
@@ -64,7 +78,7 @@ serde_json.workspace = true
 [dev-dependencies]
 divan.workspace = true
 insta.workspace = true
-korek = { workspace = true }
+korek = { workspace = true, features = ["generators"] }
 korek-core.workspace = true
 korek-ir.workspace = true
 korek-runtime.workspace = true
@@ -75,3 +89,6 @@ tempfile.workspace = true
 [[bench]]
 name = "gen"
 harness = false
+
+[package.metadata.docs.rs]
+all-features = true

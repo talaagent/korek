@@ -1,13 +1,17 @@
 [package]
 name = "korek-core"
-description = "korek's schema parser, lowering and validation"
+description = "korek's schema front end: KDL v2 parsing, lowering to the IR, validation and stable Protobuf numbering"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-core"
+readme = "README.md"
+keywords = ["schema", "kdl", "validation", "codegen", "parser"]
+categories = ["parser-implementations", "development-tools"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true
@@ -31,3 +35,6 @@ thiserror.workspace = true
 [dev-dependencies]
 miette = { workspace = true, features = ["fancy"] }
 insta.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true

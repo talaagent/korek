@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-proto"
-description = "korek's Protobuf generator: messages, enums, protovalidate rules and services"
+description = "korek's Protobuf code generator: messages, enums, protovalidate rules, gRPC/ConnectRPC services, buf.yaml"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-proto"
+readme = "README.md"
+keywords = ["protobuf", "protovalidate", "grpc", "codegen", "schema"]
+categories = ["development-tools::build-utils", "encoding"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

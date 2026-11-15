@@ -229,11 +229,11 @@ impl Validator<'_> {
             while let Type::List(inner) | Type::Map(inner) = t {
                 t = inner;
             }
-            if let Type::Named(n) = t {
-                if !declared.contains(n.as_str()) {
-                    let at = self.aux.ty_span.get(&item).copied().unwrap_or(item);
-                    self.unknown(n, at);
-                }
+            if let Type::Named(n) = t
+                && !declared.contains(n.as_str())
+            {
+                let at = self.aux.ty_span.get(&item).copied().unwrap_or(item);
+                self.unknown(n, at);
             }
         }
         for svc in &self.schema.services {
@@ -664,15 +664,15 @@ impl Validator<'_> {
         }
         let placed: std::collections::HashSet<Span> = self.examples.iter().map(|e| e.0).collect();
         for (span, args) in &self.aux.examples {
-            if !placed.contains(span) {
-                if let Some(a) = args.first() {
-                    self.diags.push(err(
-                        codes::INVALID_EXAMPLE,
-                        "examples go on types, fields and keys",
-                        a.span,
-                        "not here",
-                    ));
-                }
+            if !placed.contains(span)
+                && let Some(a) = args.first()
+            {
+                self.diags.push(err(
+                    codes::INVALID_EXAMPLE,
+                    "examples go on types, fields and keys",
+                    a.span,
+                    "not here",
+                ));
             }
         }
     }

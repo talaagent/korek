@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-zod"
-description = "korek's Zod generator: schemas checked against the bare TypeScript types"
+description = "korek's Zod v4 code generator: schemas checked against the generated TypeScript types"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-zod"
+readme = "README.md"
+keywords = ["zod", "typescript", "codegen", "validation", "schema"]
+categories = ["development-tools::build-utils"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

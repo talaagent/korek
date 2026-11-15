@@ -222,7 +222,7 @@ fn b64(s: &str, url: bool) -> bool {
     if url {
         !s.contains('=') && crate::base64::decode_with(s, true).is_some()
     } else {
-        s.len() % 4 == 0 && crate::base64::decode(s).is_some()
+        s.len().is_multiple_of(4) && crate::base64::decode(s).is_some()
     }
 }
 

@@ -742,15 +742,15 @@ impl<'e> Parser<'e> {
             ),
             _ => {
                 let tag = self.str_prop(node, "tag");
-                if let Some((t, s)) = &tag {
-                    if !crate::validate::is_snake(t) {
-                        self.diags.push(err(
-                            codes::INVALID_NAME,
-                            format!("tag `{t}` must be lower_snake_case"),
-                            *s,
-                            "here",
-                        ));
-                    }
+                if let Some((t, s)) = &tag
+                    && !crate::validate::is_snake(t)
+                {
+                    self.diags.push(err(
+                        codes::INVALID_NAME,
+                        format!("tag `{t}` must be lower_snake_case"),
+                        *s,
+                        "here",
+                    ));
                 }
                 (
                     TypeKind::Union(UnionDef {

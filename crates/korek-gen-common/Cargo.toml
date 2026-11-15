@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-common"
-description = "Shared helpers for korek generators: docs, identifiers, warnings"
+description = "Shared helpers for korek code generators: doc comments, identifiers, unsupported-rule warnings"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-common"
+readme = "README.md"
+keywords = ["codegen", "schema"]
+categories = ["development-tools"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true

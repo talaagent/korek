@@ -1,13 +1,17 @@
 [package]
 name = "korek-gen-jsonschema"
-description = "korek's JSON Schema (2020-12) generator"
+description = "korek's JSON Schema 2020-12 code generator (one file, or one per type for MCP tool inputs)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/korek-gen-jsonschema"
+readme = "README.md"
+keywords = ["json-schema", "codegen", "mcp", "schema"]
+categories = ["development-tools::build-utils", "encoding"]
 rust-version.workspace = true
-publish.workspace = true
 
 [lints]
 workspace = true
