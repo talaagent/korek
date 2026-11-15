@@ -1,0 +1,133 @@
+name: release-plz
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: Publish the committed versions without requiring a new release PR
+        type: boolean
+        default: false
+      release_packages:
+        description: Optional comma-separated workspace packages for a staged initial release
+        type: string
+        default: ""
+
+permissions: {}
+
+jobs:
+  # The built-in GITHUB_TOKEN can maintain release PRs when repository and
+  # organization settings allow it. CI is dispatched explicitly below.
+  release-plz-pr:
+    if: github.repository_owner == 'talaagent' && !github.event.repository.private && !inputs.bootstrap
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      USE_BUILTIN_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN == '' }}
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Check release PR setup
+        env:
+          HAS_CUSTOM_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN != '' }}
+          BUILTIN_PR_ENABLED: ${{ vars.RELEASE_PR == 'true' }}
+        run: |
+          if [ "$HAS_CUSTOM_TOKEN" != true ] && [ "$BUILTIN_PR_ENABLED" != true ]; then
+            echo "::error::Enable Actions-created pull requests in organization/repository settings, then set RELEASE_PR=true. RELEASE_PLZ_TOKEN is an optional alternative. See CONTRIBUTING.md."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v17
+        with:
+          name: nix-community
+          skipPush: true
+      # cargo-semver-checks comes from the flake's nixpkgs so it reads the
+      # rustdoc JSON of the dev shell's rustc.
+      - name: Install release-plz
+        run: |
+          nix profile install nixpkgs#release-plz
+          nix profile install --inputs-from . nixpkgs#cargo-semver-checks
+      - uses: release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+      # The semver check builds the published crates in the nix dev shell
+      # (the toolchain from rust-toolchain.toml).
+      - name: release-plz release-pr
+        run: >-
+          nix develop --command release-plz release-pr
+          --git-token "$GITHUB_TOKEN"
+          --repo-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Start CI for release PRs
+        if: env.USE_BUILTIN_TOKEN == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          gh pr list --base "$BASE_BRANCH" --state open \
+            --json headRefName,headRefOid,isCrossRepository \
+            --jq '.[] | select(.isCrossRepository == false) | select(.headRefName | startswith("release-plz-")) | [.headRefName, .headRefOid] | @tsv' |
+          while IFS=$'\t' read -r branch sha; do
+            runs=$(gh run list --workflow ci.yml --commit "$sha" --limit 1 --json databaseId --jq 'length')
+            if [ "$runs" = 0 ]; then
+              gh workflow run ci.yml --ref "$branch"
+            fi
+          done
+
+  # Publishes unpublished versions to crates.io, tags them and creates the
+  # GitHub release using crates.io OIDC trusted publishing. New crates
+  # need a separate first publication before their trust can be registered.
+  # Publishing (which builds each package) runs in the nix dev shell. With
+  # release_always = false it only publishes when the commit comes from a
+  # merged release PR (a `release-plz-` branch), which it looks up through
+  # the GitHub API.
+  release-plz-release:
+    concurrency:
+      group: release-plz-publish-${{ github.ref }}
+      cancel-in-progress: false
+    if: github.repository_owner == 'talaagent' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: cachix/cachix-action@v17
+        with:
+          name: nix-community
+          skipPush: true
+      - name: Install release-plz
+        run: nix profile install nixpkgs#release-plz
+      - name: Prepare manual release
+        if: inputs.bootstrap
+        env:
+          RELEASE_PACKAGES: ${{ inputs.release_packages }}
+        run: python3 scripts/prepare-manual-release "$RUNNER_TEMP/release-plz-manual.toml"
+      - name: release-plz release
+        run: nix develop --command release-plz release --git-token "$GITHUB_TOKEN" --config "$RELEASE_CONFIG"
+        env:
+          RELEASE_CONFIG: ${{ inputs.bootstrap && format('{0}/release-plz-manual.toml', runner.temp) || 'release-plz.toml' }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}

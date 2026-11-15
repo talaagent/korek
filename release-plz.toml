@@ -1,0 +1,87 @@
+# Runs from .github/workflows/release-plz.yml while the repo is public.
+# All published crates share one version, one changelog and one tag (on
+# korek-cli). korek-fixture and korek-gen-example are publish = false.
+[workspace]
+changelog_update = false
+git_tag_enable = false
+git_release_enable = false
+publish = true
+semver_check = true
+# Publish only when the pushed commit is a merged release-plz PR, not on any version bump.
+release_always = false
+
+[[package]]
+name = "korek-cli"
+changelog_update = true
+changelog_path = "CHANGELOG.md"
+changelog_include = [
+  "korek",
+  "korek-core",
+  "korek-gen-common",
+  "korek-gen-docs",
+  "korek-gen-jsonschema",
+  "korek-gen-proto",
+  "korek-gen-rust",
+  "korek-gen-ts",
+  "korek-gen-zod",
+  "korek-ir",
+  "korek-plugin",
+  "korek-runtime",
+  "korek-testkit",
+]
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+git_release_enable = true
+version_group = "korek"
+
+[[package]]
+name = "korek"
+version_group = "korek"
+
+[[package]]
+name = "korek-core"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-common"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-docs"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-jsonschema"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-proto"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-rust"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-ts"
+version_group = "korek"
+
+[[package]]
+name = "korek-gen-zod"
+version_group = "korek"
+
+[[package]]
+name = "korek-ir"
+version_group = "korek"
+
+[[package]]
+name = "korek-plugin"
+version_group = "korek"
+
+[[package]]
+name = "korek-runtime"
+version_group = "korek"
+
+[[package]]
+name = "korek-testkit"
+version_group = "korek"
