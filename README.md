@@ -1,5 +1,15 @@
 # korek
 
+[![CI](https://github.com/talaagent/korek/actions/workflows/ci.yml/badge.svg)](https://github.com/talaagent/korek/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/korek-cli.svg)](https://crates.io/crates/korek-cli)
+[![downloads](https://img.shields.io/crates/d/korek-cli.svg)](https://crates.io/crates/korek-cli)
+[![docs.rs](https://docs.rs/korek/badge.svg)](https://docs.rs/korek)
+[![lib.rs](https://img.shields.io/badge/lib.rs-korek--cli-blue.svg)](https://lib.rs/crates/korek-cli)
+[![Rust 1.88+](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://github.com/talaagent/korek/blob/main/Cargo.toml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/talaagent/korek/blob/main/LICENSE)
+
+Schema-first code generation: one schema, generated Rust, Protobuf, Zod,
+TypeScript and JSON Schema that agree on types, defaults and validation.
 *korek* is Taglish for "correct": define your types once, get them correct
 everywhere.
 
@@ -10,9 +20,9 @@ You declare types (enums, structs, tagged and untagged unions), typed keys
 | Plugin | Output |
 |---|---|
 | `korek-gen-rust` | serde types, `validate()` per type, `Default`s, typed key consts (`keys::SESSION_STEER_ENABLED: Key<bool>`) |
-| `korek-gen-proto` | Protobuf with [protovalidate](https://protovalidate.com) rules for every validation rule, `service`s for ConnectRPC/gRPC, a `buf.yaml` |
+| `korek-gen-proto` | Protobuf with [protovalidate](https://protovalidate.com) rules for each validation rule it can express, `service`s for ConnectRPC/gRPC, a `buf.yaml` |
 | `korek-gen-zod` | Zod v4 schemas, each `satisfies z.ZodType<T>` against the TS types (never `z.infer`), and a typed `keys` record |
-| `korek-gen-ts` | bare TypeScript types and a `Keys` interface; rules as JSDoc tags; no runtime dependency |
+| `korek-gen-ts` | bare TypeScript types and a `Keys` interface; rules as `JSDoc` tags; no runtime dependency |
 | `korek-gen-jsonschema` | JSON Schema 2020-12 (one file, or one per type for MCP tool inputs) |
 | `korek-gen-docs` | markdown reference: types, keys tables, rules in words, units humanized; extra columns from extension metadata (`columns=Layers=ext:setting.props.layers`) |
 
@@ -21,12 +31,19 @@ loads and validates the schema, then sends each plugin the IR as a JSON
 `GenerateRequest`. The CLI links the six first-party generators in-process
 (the default `builtin` feature); a `korek-gen-<name>` on `PATH` or
 `--plugin name=path` overrides them, and anything else runs as a subprocess.
-A third-party plugin is about 20 lines ([example](examples/plugin-example/src/main.rs)).
+A third-party plugin is about 30 lines ([example](https://github.com/talaagent/korek/blob/main/examples/plugin-example/src/main.rs)).
+
+## Install
+
+```sh
+cargo install korek-cli
+```
+
+or run it with nix: `nix run github:talaagent/korek -- gen …`.
 
 ## Usage
 
 ```sh
-cargo install --git https://github.com/talaagent/korek korek-cli   # or: nix run github:talaagent/korek --
 korek gen --rust src/gen --proto proto --zod web/gen/zod --ts web/gen/ts --jsonschema schemas schema/
 ```
 
@@ -49,7 +66,7 @@ is skipped, and when every plugin is, the schema is not loaded at all. `--strict
 `korek::rule_unsupported` warnings into errors. `--message-format json`
 prints diagnostics as JSON lines (code, severity, message, help, url,
 labels with file/line/col). Every code is documented in
-[docs/errors.md](docs/errors.md).
+[docs/errors.md](https://github.com/talaagent/korek/blob/main/docs/errors.md).
 
 Options: `--rust_opt file=…` and `rust_duration=true` (integer fields and keys
 with a time `unit`, `nanoseconds` through `hours`, become `std::time::Duration`
@@ -61,7 +78,7 @@ off by default); `--proto_opt protovalidate=false,buf_yaml=false`;
 
 ## The schema
 
-From [examples/basic/schema](examples/basic/schema):
+From [examples/basic/schema](https://github.com/talaagent/korek/tree/main/examples/basic/schema):
 
 ```kdl
 package "example.v1"
@@ -119,7 +136,7 @@ service ContactsService {
   Fields can be `optional=#true` and have a `default=` (JSON text for
   lists, maps, structs and `json`). Recursive types are
   not supported yet.
-- **Validation**: a `validate { … }` block; see [VALIDATION.md](VALIDATION.md)
+- **Validation**: a `validate { … }` block; see [VALIDATION.md](https://github.com/talaagent/korek/blob/main/VALIDATION.md)
   for every rule and what each target supports.
 - **Docs and metadata** on every item: `doc` (one line), `description`
   (markdown, `"""` multiline), `example` (repeatable, checked against the
@@ -156,10 +173,10 @@ lockfile is an error.
 
 ## Output excerpts
 
-Rust ([full](examples/basic/gen/rust/types.rs); needs `serde` and
+Rust ([full](https://github.com/talaagent/korek/blob/main/examples/basic/gen/rust/types.rs); needs `serde` and
 `korek-runtime`):
 
-```rust
+```rust,ignore
 pub struct McpHttp {
     pub url: String,
     /// Unit: milliseconds.
@@ -184,7 +201,7 @@ impl ::korek_runtime::Validate for McpHttp {
 }
 ```
 
-Protobuf ([full](examples/basic/gen/proto/example/v1/types.proto)):
+Protobuf ([full](https://github.com/talaagent/korek/blob/main/examples/basic/gen/proto/example/v1/types.proto)):
 
 ```proto
 message McpHttp {
@@ -203,7 +220,7 @@ message McpServer {
 }
 ```
 
-Zod ([full](examples/basic/gen/zod/zod.ts)):
+Zod ([full](https://github.com/talaagent/korek/blob/main/examples/basic/gen/zod/zod.ts)):
 
 ```ts
 import type { McpHttp, McpServer, Keys /* … */ } from "../ts/types";
@@ -218,10 +235,10 @@ export const McpHttpSchema = z.object({
 export const keys: { [K in keyof Keys]-?: Key<Keys[K]> } = { /* "session.timeout": { schema, default, doc }, … */ };
 ```
 
-TypeScript ([full](examples/basic/gen/ts/types.ts)) and JSON Schema
-([full](examples/basic/gen/jsonschema/schema.json)) are alongside.
+TypeScript ([full](https://github.com/talaagent/korek/blob/main/examples/basic/gen/ts/types.ts)) and JSON Schema
+([full](https://github.com/talaagent/korek/blob/main/examples/basic/gen/jsonschema/schema.json)) are alongside.
 
-### ConnectRPC and protovalidate
+### `ConnectRPC` and protovalidate
 
 `korek-gen-proto` writes a `buf.yaml` with the protovalidate dependency
 (run `buf dep update` once for `buf.lock`). Stock buf plugins generate
@@ -248,11 +265,9 @@ Validate at runtime with `@bufbuild/protovalidate` or
 
 ## As a library
 
-Depend on korek from git (it is not published):
-
 ```toml
 [dependencies]
-korek = { git = "https://github.com/talaagent/korek" }
+korek = "0.1"
 ```
 
 | Crate | What |
@@ -261,6 +276,7 @@ korek = { git = "https://github.com/talaagent/korek" }
 | `korek-ir` | the IR and plugin protocol: pure serde data, minimal deps |
 | `korek-plugin` | `run`, encoding, `Hook` (no parser dependency, so plugins build fast) |
 | `korek-core` | parsing, lowering, validation, lockfile, extensions (`miette` feature for rendering) |
+| `korek-gen-common` | helpers shared by the generators |
 | `korek-gen-*` | one library per generator: `generate(&schema, &opts, hooks)` and `plugin(&req)` |
 | `korek-runtime` | what generated Rust needs: `Validate`, `Key<T>`, formats, base64 |
 | `korek-testkit` | shared validation vectors and a conformance runner for any generator |
@@ -279,14 +295,14 @@ schema), reads it back typed with `ext_as::<T>()`, and can cross-check the
 finished schema; the metadata reaches every plugin. An external crate can
 register a node kind, validate it, and ship its own `korek-gen-*` plugin that
 reads the metadata. See
-[crates/korek-cli/tests/extension.rs](crates/korek-cli/tests/extension.rs)
+[crates/korek-cli/tests/extension.rs](https://github.com/talaagent/korek/blob/main/crates/korek-cli/tests/extension.rs)
 for a `feature_flag` extension (`owner`, `expires`, keys `gated_by` a flag)
 with a generator hook. From the CLI, `--ext NAME` captures nodes and
 properties called `NAME` as generic JSON.
 
 ### Writing a plugin
 
-```rust
+```rust,no_run
 use korek_plugin::{File, GenerateResponse};
 
 fn main() -> std::process::ExitCode {
@@ -302,21 +318,18 @@ output through `korek-testkit` to check it agrees with the shared vectors.
 
 ## Roadmap
 
-Not in v1: `korek fmt`, a docs/markdown generator, schema imports across
-packages, breaking-change detection against a git ref, an LSP, Python and Go
-generators, recursive types, generating korek's own IR from its korek schema
-([schema/korek](schema/korek) describes it and is checked against it; see
-"Self-hosting" in CLAUDE.md).
+Not there yet: `korek fmt`, schema imports across packages, breaking-change
+detection against a git ref, an LSP, Python and Go generators, recursive
+types, and generating korek's own IR from its korek schema
+([schema/korek](https://github.com/talaagent/korek/tree/main/schema/korek) describes it and a test checks it against the
+hand-written types).
 
-## Development
+## Contributing
 
-```sh
-nix develop            # Rust (rust-toolchain.toml), bun, buf, protoc
-cargo test --workspace
-bun install && bun test && bun run typecheck
-KOREK_BLESS=1 cargo test -p korek-cli --test golden    # regenerate goldens
-KOREK_BLESS=1 cargo test -p korek-testkit               # after editing the vectors
-cargo bench -p korek-cli                                # see BENCHMARKS.md
-```
+See [CONTRIBUTING.md](https://github.com/talaagent/korek/blob/main/CONTRIBUTING.md) for the checks and the release
+process, and [AGENTS.md](https://github.com/talaagent/korek/blob/main/AGENTS.md) for the layout and conventions.
+Benchmarks: [BENCHMARKS.md](https://github.com/talaagent/korek/blob/main/BENCHMARKS.md).
 
-Licensed under Apache-2.0.
+## License
+
+Apache-2.0; see [LICENSE](https://github.com/talaagent/korek/blob/main/LICENSE).
