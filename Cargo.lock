@@ -306,7 +306,7 @@ checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 [[package]]
 name = "kdl-load"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
+source = "git+https://github.com/talaagent/kdl-kit?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
  "kdl-span",
  "kdl-tree",
@@ -316,7 +316,7 @@ dependencies = [
 [[package]]
 name = "kdl-nodes"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
+source = "git+https://github.com/talaagent/kdl-kit?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
  "kdl-span",
  "kdl-tree",
@@ -326,7 +326,7 @@ dependencies = [
 [[package]]
 name = "kdl-span"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
+source = "git+https://github.com/talaagent/kdl-kit?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
  "kdl-tree",
  "miette",
@@ -335,7 +335,7 @@ dependencies = [
 [[package]]
 name = "kdl-tree"
 version = "0.1.0"
-source = "git+https://github.com/talaagent/kdl-serde?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
+source = "git+https://github.com/talaagent/kdl-kit?rev=922c43d#922c43db211b33874b7055e3a3acf76ede99d4de"
 dependencies = [
  "thiserror",
 ]

@@ -1,6 +1,6 @@
 //! The adapter between korek and the KDL parser: the only module that
 //! names the KDL tree types. Files are parsed into kdl-tree documents with
-//! kdl-load (talaagent/kdl-serde), child nodes walked with kdl-nodes, and
+//! kdl-load (talaagent/kdl-kit), child nodes walked with kdl-nodes, and
 //! kdl-span carries parse problems; everything past this module sees
 //! [`Node`], [`Literal`] and korek [`Span`]s.
 

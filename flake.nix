@@ -49,8 +49,8 @@
           };
           cargoLock = {
             lockFile = ./Cargo.lock;
-            # talaagent/kdl-serde (kdl-load, kdl-nodes, kdl-span) is private: fetch it
-            # at evaluation time with the user's git credentials.
+            # kdl-load, kdl-nodes and kdl-span are git dependencies on
+            # talaagent/kdl-kit until they are on crates.io.
             allowBuiltinFetchGit = true;
           };
           cargoBuildFlags = [

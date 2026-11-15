@@ -32,9 +32,12 @@ bpaf = { version = "0.9", features = ["derive"] }
 divan = "0.1"
 heck = "0.5"
 insta = "1"
-kdl-load = { git = "https://github.com/talaagent/kdl-serde", rev = "922c43d", default-features = false }
-kdl-nodes = { git = "https://github.com/talaagent/kdl-serde", rev = "922c43d", default-features = false }
-kdl-span = { git = "https://github.com/talaagent/kdl-serde", rev = "922c43d", default-features = false }
+# kdl-kit (https://github.com/talaagent/kdl-kit): KDL loading, spans and
+# node helpers. Pinned by git rev until kdl-kit is on crates.io; then switch
+# these to plain `version = "0.1.0"` entries (keep default-features = false).
+kdl-load = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
+kdl-nodes = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
+kdl-span = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
 miette = "7"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

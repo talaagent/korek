@@ -1,6 +1,6 @@
 //! Reading schema files: a directory of `.kdl` files as one ordered set of
 //! sources, and line/column lookup for spans. Listing and the source map
-//! come from `kdl-load` and `kdl-span` (talaagent/kdl-serde).
+//! come from `kdl-load` and `kdl-span` (talaagent/kdl-kit).
 
 use alloc::sync::Arc;
 use std::path::{Path, PathBuf};
