@@ -3,3 +3,5 @@
 [toolchain]
 channel = "stable"
 components = ["rustfmt", "clippy", "rust-src"]
+# For the no_std build (CI's `no-std` job), also from `nix develop`.
+targets = ["thumbv7em-none-eabihf"]

@@ -59,8 +59,48 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: thumbv7em-none-eabihf
       - uses: Swatinem/rust-cache@v2
-      # korek-ir and korek-gen-common are no_std + alloc.
-      - run: cargo build -p korek-ir -p korek-gen-common --target thumbv7em-none-eabihf --locked
+      # korek-ir, korek-gen-*, korek-plugin and korek-runtime are no_std +
+      # alloc without their default `std` feature; the rest need std.
+      - run: >-
+          cargo build --workspace --exclude korek --exclude korek-cli
+          --exclude korek-core --exclude korek-fixture --exclude korek-testkit
+          --exclude korek-gen-example --no-default-features
+          --target thumbv7em-none-eabihf --locked
+      - name: with the regex and json features
+        run: >-
+          cargo build --workspace --exclude korek --exclude korek-cli
+          --exclude korek-core --exclude korek-fixture --exclude korek-testkit
+          --exclude korek-gen-example --no-default-features
+          --features korek-runtime/regex,korek-runtime/json
+          --target thumbv7em-none-eabihf --locked
+
+  no-std-test:
+    name: tests without std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # dtolnay/rust-toolchain master @ 2026-10-16
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      # The no_std crates' tests on the host with `std` off, so the cfg
+      # gates and the non-std paths run. korek-gen-docs and korek-gen-proto
+      # are left out: their tests load schemas through korek-core, which
+      # would turn `std` back on in korek-runtime (they have no `std`
+      # feature, so the default test job covers them).
+      - run: >-
+          cargo test --workspace --exclude korek --exclude korek-cli
+          --exclude korek-core --exclude korek-fixture --exclude korek-testkit
+          --exclude korek-gen-example --exclude korek-gen-docs
+          --exclude korek-gen-proto --no-default-features --lib --tests --locked
+      - name: with the regex and json features
+        run: >-
+          cargo test --workspace --exclude korek --exclude korek-cli
+          --exclude korek-core --exclude korek-fixture --exclude korek-testkit
+          --exclude korek-gen-example --exclude korek-gen-docs
+          --exclude korek-gen-proto --no-default-features
+          --features korek-runtime/regex,korek-runtime/json --lib --tests --locked
 
   test:
     name: test

@@ -274,13 +274,24 @@ korek = "0.1"
 |---|---|
 | `korek` | the facade: re-exports, generators (feature `generators`), and `Driver` |
 | `korek-ir` | the IR and plugin protocol: pure serde data, minimal deps, `no_std` + `alloc` |
-| `korek-plugin` | `run`, encoding, `Hook` (no parser dependency, so plugins build fast) |
+| `korek-plugin` | `run`, encoding, `Hook` (no parser dependency, so plugins build fast; `no_std` + `alloc` without `std`) |
 | `korek-core` | parsing, lowering, validation, lockfile, extensions (`miette` feature for rendering) |
 | `korek-gen-common` | helpers shared by the generators (`no_std` + `alloc`) |
-| `korek-gen-*` | one library per generator: `generate(&schema, &opts, hooks)` and `plugin(&req)` |
-| `korek-runtime` | what generated Rust needs: `Validate`, `Key<T>`, formats, base64 |
+| `korek-gen-*` | one library per generator: `generate(&schema, &opts, hooks)` and `plugin(&req)` (`no_std` + `alloc`) |
+| `korek-runtime` | what generated Rust needs: `Validate`, `Key<T>`, formats, base64 (`no_std` + `alloc` without `std`) |
 | `korek-testkit` | shared validation vectors and a conformance runner for any generator |
 | `korek-cli` | the `korek` binary and the `korek-gen-*` plugin binaries |
+
+`korek-ir`, `korek-gen-common` and the `korek-gen-*` libraries are always
+`no_std` + `alloc`. `korek-plugin` and `korek-runtime` are too with
+`default-features = false`; their default `std` feature gates
+`korek_plugin::run` (stdin, stdout, `KOREK_ENCODING`) and
+`korek_runtime::time::now` (the `past`, `future` and `within` rules), and
+turns on std in `serde`, `serde_json` and `regex-automata`. korek-runtime's
+`regex` (pattern rules, emoji) and `json` features work without std. The
+Rust that korek generates still names `std` paths. The other crates need
+std. CI builds the `no_std` crates for `thumbv7em-none-eabihf` and runs
+their tests with `--no-default-features`.
 
 `korek_core::load(dir)` returns the IR; `korek_core::Loader` adds
 extensions, a lockfile path and in-memory sources. Generators take
