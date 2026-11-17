@@ -1,5 +1,7 @@
 //! Validation rules in words, and values with their units humanized.
 
+use alloc::{borrow::ToOwned, boxed::Box, format, string::String, string::ToString, vec::Vec};
+
 use korek_ir::{Format, Json, Rule, RuleKind, Type, Validate, format_number};
 
 use crate::md::code;
@@ -11,7 +13,7 @@ fn count(n: u64, one: &str, many: &str) -> String {
 
 /// `x` as a number with at most two decimals, if it is one.
 fn short(x: f64) -> Option<String> {
-    let scaled = (x * 100.0).round();
+    let scaled = libm::round(x * 100.0);
     ((scaled - x * 100.0).abs() < 1e-6).then(|| format_number(scaled / 100.0))
 }
 

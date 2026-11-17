@@ -14,6 +14,12 @@
 //! `true`), `buf_yaml` (default `true`: also write a `buf.yaml` with the
 //! protovalidate dependency).
 
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{borrow::ToOwned, format, string::String, string::ToString, vec, vec::Vec};
+
 use core::fmt::Write as _;
 
 use korek_gen_common::{GENERATED, comment, doc_text};

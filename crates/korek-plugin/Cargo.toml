@@ -16,7 +16,14 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = ["std"]
+# Without it the crate is no_std + alloc (the protocol types, `Encoding`,
+# `Hook`). Gates `run`, which reads stdin, writes stdout and reads
+# `KOREK_ENCODING`.
+std = ["serde/std", "serde_json/std"]
+
 [dependencies]
 korek-ir.workspace = true
-serde = { workspace = true, features = ["std"] }
-serde_json = { workspace = true, features = ["std"] }
+serde.workspace = true
+serde_json.workspace = true

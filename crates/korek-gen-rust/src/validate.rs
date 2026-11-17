@@ -1,5 +1,7 @@
 //! `validate_at` bodies: one `if` per rule, no allocation unless it fails.
 
+use alloc::{borrow::ToOwned, format, string::String, string::ToString, vec::Vec};
+
 use core::fmt::Write as _;
 
 use korek_gen_common::{rust_ident, unsupported};
@@ -389,7 +391,7 @@ fn condition(ty: &Type, k: &RuleKind, var: &str, is_enum: bool) -> Option<(Strin
         ),
         RuleKind::Pattern { regex } => (
             format!(
-                "{{ static RE: ::std::sync::OnceLock<{RT}::regex::Regex> = ::std::sync::OnceLock::new(); !{RT}::matches(&RE, {regex:?}, &{text}) }}"
+                "{{ static RE: {RT}::RegexCell = {RT}::RegexCell::new(); !{RT}::matches(&RE, {regex:?}, &{text}) }}"
             ),
             format!("must match {regex:?}"),
         ),

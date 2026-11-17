@@ -15,12 +15,12 @@ rust-version = "1.88"
 [workspace.dependencies]
 korek-core = { path = "crates/korek-core", version = "0.1.0" }
 korek-ir = { path = "crates/korek-ir", version = "0.1.0" }
-korek-runtime = { path = "crates/korek-runtime", version = "0.1.0" }
+korek-runtime = { path = "crates/korek-runtime", version = "0.1.0", default-features = false }
 korek-gen-common = { path = "crates/korek-gen-common", version = "0.1.0" }
 korek-gen-docs = { path = "crates/korek-gen-docs", version = "0.1.0" }
 korek-gen-jsonschema = { path = "crates/korek-gen-jsonschema", version = "0.1.0" }
 korek-cli = { path = "crates/korek-cli", version = "0.1.0" }
-korek-plugin = { path = "crates/korek-plugin", version = "0.1.0" }
+korek-plugin = { path = "crates/korek-plugin", version = "0.1.0", default-features = false }
 korek-gen-rust = { path = "crates/korek-gen-rust", version = "0.1.0" }
 korek-gen-proto = { path = "crates/korek-gen-proto", version = "0.1.0" }
 korek-gen-zod = { path = "crates/korek-gen-zod", version = "0.1.0" }
@@ -36,13 +36,21 @@ insta = "1"
 # kdl-kit (https://github.com/talaagent/kdl-kit): KDL loading, spans and
 # node helpers. Pinned by git rev until kdl-kit is on crates.io; then switch
 # these to plain `version = "0.1.0"` entries (keep default-features = false).
+# f64 rounding without std (korek-gen-docs, korek-gen-proto).
+libm = "0.2"
 kdl-load = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
 kdl-nodes = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
 kdl-span = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
 miette = "7"
 regex = "1"
-# korek-ir and korek-gen-common are no_std + alloc; the other crates opt
-# back into `std`.
+# korek-runtime's `regex` feature: the engine behind `regex::Regex`, which
+# (unlike `regex`) builds without std. Same matching features as `regex`'s
+# defaults (perf, unicode).
+regex-automata = { version = "0.4.18", default-features = false, features = ["syntax", "meta", "nfa-pikevm", "nfa-backtrack", "hybrid", "dfa-onepass", "perf", "unicode"] }
+# korek-ir, korek-gen-*, korek-plugin and korek-runtime are no_std + alloc;
+# the other crates opt back into `std` (korek-plugin and korek-runtime
+# through their `std` features).
+once_cell = { version = "1.21", default-features = false, features = ["race", "alloc"] }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0.154", default-features = false, features = ["alloc", "preserve_order"] }
 tempfile = "3"

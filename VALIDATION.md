@@ -36,7 +36,7 @@ those cells of the table rest on the generators' unit and golden tests.
 | `in` / `not_in` | scalars, enums, duration | ✓ | ≈ refine | ✓ | ✓ `enum` / `not` |
 | `len` / `min_len` / `max_len` | string (characters), bytes | ✓ | ≈ refine (code points) | ✓ | ✓ strings; — bytes |
 | `len_bytes` / `min_bytes` / `max_bytes` | string (UTF-8 bytes) | ✓ | ≈ refine | ✓ | — |
-| `pattern` | string, bytes | ✓ (RE2) | ✓ `.regex` | ✓ (`regex` crate) | ✓ strings |
+| `pattern` | string, bytes | ✓ (RE2) | ✓ `.regex` | ✓ (`regex-automata`) | ✓ strings |
 | `prefix` / `suffix` / `contains` | string, bytes | ✓ | ✓ / ≈ for bytes | ✓ | ≈ `pattern` |
 | `not_contains` | string | ✓ | ≈ refine | ✓ | ≈ `not.pattern` |
 | `email` `hostname` `ipv4` `ipv6` `uuid` `ulid` | string | ✓ | ✓ | ✓ | ✓ / ≈ |

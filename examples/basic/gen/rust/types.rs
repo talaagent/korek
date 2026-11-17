@@ -147,7 +147,7 @@ impl ::korek_runtime::Validate for McpStdio {
                 for (k, v) in v {
                     let path = path.key(k);
                     let _ = (&k, &v);
-                    if { static RE: ::std::sync::OnceLock<::korek_runtime::regex::Regex> = ::std::sync::OnceLock::new(); !::korek_runtime::matches(&RE, "^[A-Z_][A-Z0-9_]*$", &k.as_str()) } {
+                    if { static RE: ::korek_runtime::RegexCell = ::korek_runtime::RegexCell::new(); !::korek_runtime::matches(&RE, "^[A-Z_][A-Z0-9_]*$", &k.as_str()) } {
                         errors.push(&path, "pattern", "must match \"^[A-Z_][A-Z0-9_]*$\"");
                     }
                 }
@@ -522,7 +522,7 @@ pub mod keys {
     };
 
     fn check_provider_model(v: &String, path: &::korek_runtime::Path<'_>, errors: &mut ::korek_runtime::ValidationErrors) {
-        if { static RE: ::std::sync::OnceLock<::korek_runtime::regex::Regex> = ::std::sync::OnceLock::new(); !::korek_runtime::matches(&RE, "^[a-z0-9.-]+$", &v.as_str()) } {
+        if { static RE: ::korek_runtime::RegexCell = ::korek_runtime::RegexCell::new(); !::korek_runtime::matches(&RE, "^[a-z0-9.-]+$", &v.as_str()) } {
             errors.push(&path, "pattern", "must match \"^[a-z0-9.-]+$\"");
         }
     }

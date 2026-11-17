@@ -17,16 +17,20 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["regex", "json"]
+default = ["std", "regex", "json"]
+# Without it the crate is no_std + alloc. Gates `time::now` (so the
+# `past`/`future`/`within` rules) and std support in the dependencies.
+std = ["serde/std", "serde_json?/std", "regex-automata?/std"]
 # `pattern` rules and the emoji format.
-regex = ["dep:regex"]
+regex = ["dep:regex-automata", "dep:once_cell"]
 # `json` fields (`serde_json::Value`).
 json = ["dep:serde_json"]
 
 [dependencies]
-regex = { workspace = true, optional = true }
-serde = { workspace = true, features = ["std"] }
-serde_json = { workspace = true, optional = true, features = ["std"] }
+once_cell = { workspace = true, optional = true }
+regex-automata = { workspace = true, optional = true }
+serde.workspace = true
+serde_json = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

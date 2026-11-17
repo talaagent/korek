@@ -7,6 +7,12 @@
 //!
 //! Options: `file` (default `types.ts`).
 
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{format, string::String, vec, vec::Vec};
+
 use core::fmt::Write as _;
 
 use korek_gen_common::{GENERATED, js, jsdoc, jsdoc_lines, ts_prop};

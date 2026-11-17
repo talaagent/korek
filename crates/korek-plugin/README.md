@@ -26,4 +26,7 @@ fn main() -> std::process::ExitCode {
 
 Name the binary `korek-gen-<name>` and run `korek gen --out <name>=DIR`.
 
+`run` needs the default `std` feature. With `default-features = false` the
+crate is `no_std` + `alloc`: the protocol types, `Encoding` and `Hook`.
+
 Part of [korek](https://github.com/talaagent/korek): schema files in, Rust, Protobuf, Zod, TypeScript and JSON Schema out.

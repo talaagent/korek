@@ -6,6 +6,12 @@
 //! `use` items and no inner attributes, so it can be `include!`d. It needs
 //! `serde` (with `derive`) and `korek-runtime` in the including crate.
 
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{borrow::ToOwned, format, string::String, string::ToString, vec, vec::Vec};
+
 mod validate;
 
 use core::fmt::Write as _;
