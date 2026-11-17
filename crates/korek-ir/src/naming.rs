@@ -1,6 +1,12 @@
 //! Names derived from schema names, shared by the core's collision checks
 //! and the generators.
 
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 use crate::ir::{KeyGroup, Type};
 
 /// The message/interface name of a keys block: `ui.theme` → `UiThemeKeys`.

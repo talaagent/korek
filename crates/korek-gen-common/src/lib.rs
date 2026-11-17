@@ -1,6 +1,16 @@
 //! Helpers shared by korek's generators: doc comments from [`Attrs`],
 //! identifier escaping, and the warning for rules a target cannot express.
 
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{
+    borrow::ToOwned,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::fmt::Write as _;
 
 use korek_ir::codes;

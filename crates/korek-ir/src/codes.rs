@@ -3,6 +3,8 @@
 //! keeps the two in sync).
 
 /// `(code, one-line summary, severity is warning)`.
+use alloc::{format, string::String};
+
 pub const ALL: &[(&str, &str, bool)] = &[
     (SYNTAX, "the file is not valid KDL v2", false),
     (IO, "a schema file or directory could not be read", false),

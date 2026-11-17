@@ -2,6 +2,8 @@
 //! ([`protocol`]) types: pure serde data with minimal dependencies, so
 //! plugins compile fast. Helper methods live in a separate module.
 
+#![no_std]
+
 extern crate alloc;
 
 pub mod codes;

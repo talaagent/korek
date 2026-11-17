@@ -1,7 +1,7 @@
 //! The plugin protocol: what the driver sends a generator plugin and what
 //! it answers. Pure data.
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 use serde::{Deserialize, Serialize};
 

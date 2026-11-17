@@ -73,7 +73,7 @@ korek-gen-ts.workspace = true
 korek-gen-zod.workspace = true
 korek-plugin.workspace = true
 miette = { workspace = true, features = ["fancy"] }
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["std"] }
 
 [dev-dependencies]
 divan.workspace = true
@@ -83,7 +83,7 @@ korek-core.workspace = true
 korek-ir.workspace = true
 korek-runtime.workspace = true
 korek-testkit.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["std"] }
 tempfile.workspace = true
 
 [[bench]]
