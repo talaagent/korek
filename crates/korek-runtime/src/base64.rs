@@ -1,6 +1,9 @@
 //! Standard base64 (with padding), the JSON form of `bytes`, and a serde
 //! adapter: `#[serde(with = "korek_runtime::base64")]`.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 pub fn encode(bytes: &[u8]) -> String {
@@ -95,6 +98,9 @@ impl crate::with::Codec<alloc::vec::Vec<u8>> for Base64 {
 
 /// The same for `Option<Vec<u8>>`.
 pub mod option {
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
     /// # Errors
     /// From the serializer.
     pub fn serialize<S: serde::Serializer>(v: &Option<Vec<u8>>, s: S) -> Result<S::Ok, S::Error> {

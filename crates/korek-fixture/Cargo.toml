@@ -11,7 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
-korek-runtime.workspace = true
+korek-runtime = { workspace = true, features = ["std", "regex", "json"] }
 serde = { workspace = true, features = ["std"] }
 
 [dev-dependencies]

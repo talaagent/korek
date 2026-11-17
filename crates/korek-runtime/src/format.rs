@@ -260,7 +260,7 @@ pub fn e164(s: &str) -> bool {
 pub fn emoji(s: &str) -> bool {
     #[cfg(feature = "regex")]
     {
-        static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+        static RE: crate::RegexCell = crate::RegexCell::new();
         crate::matches(
             &RE,
             r"^(\p{Extended_Pictographic}|\p{Emoji_Component})+$",

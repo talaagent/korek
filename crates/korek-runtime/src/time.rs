@@ -106,7 +106,8 @@ pub fn parse_duration(s: &str) -> Option<f64> {
     (v.abs() <= 315_576_000_000.0).then_some(v)
 }
 
-/// Seconds since the epoch, now.
+/// Seconds since the epoch, now (needs the `std` feature).
+#[cfg(feature = "std")]
 pub fn now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

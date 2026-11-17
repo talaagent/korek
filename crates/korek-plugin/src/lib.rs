@@ -21,8 +21,22 @@
 //!
 //! Generators also take [`Hook`]s when called in-process, so an extension can
 //! add output (extra items after a type, extra files) without forking them.
+//!
+//! Without the default `std` feature the crate is `no_std` + `alloc`: the
+//! protocol types, [`Encoding`] and [`Hook`] stay; `run` (stdin, stdout and
+//! the environment) needs `std`.
 
+#![no_std]
+
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
+
+use alloc::string::{String, ToString as _};
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
 use std::io::{Read as _, Write as _};
+#[cfg(feature = "std")]
 use std::process::ExitCode;
 
 pub use korek_ir as ir;
@@ -103,7 +117,10 @@ pub trait Hook {
 
 /// Runs a plugin: reads the request from stdin, calls `f`, writes the
 /// response to stdout. An `Err` becomes a response with that error.
+#[cfg(feature = "std")]
 pub fn run(f: impl FnOnce(&GenerateRequest) -> Result<GenerateResponse, Diagnostic>) -> ExitCode {
+    use std::eprintln;
+
     let name = std::env::var(ENCODING_ENV).unwrap_or_else(|_| "json".into());
     let Some(enc) = Encoding::from_name(&name) else {
         eprintln!("unsupported encoding {name:?}");
@@ -126,7 +143,7 @@ pub fn run(f: impl FnOnce(&GenerateRequest) -> Result<GenerateResponse, Diagnost
     } else {
         GenerateResponse::error(Diagnostic::error(
             korek_ir::codes::PLUGIN_PROTOCOL,
-            format!(
+            alloc::format!(
                 "plugin speaks protocol {PROTOCOL_VERSION}, driver sent {}",
                 req.protocol_version
             ),
@@ -148,4 +165,20 @@ pub fn run(f: impl FnOnce(&GenerateRequest) -> Result<GenerateResponse, Diagnost
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_round_trip() {
+        let enc = Encoding::from_name(Encoding::Json.name()).unwrap_or_default();
+        let resp = GenerateResponse::new(alloc::vec![File::new("a.txt", "hi")]);
+        let bytes = enc.encode(&resp).unwrap_or_default();
+        let back: GenerateResponse = enc.decode(&bytes).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(back.files.len(), 1);
+        assert_eq!(back.files[0].content, "hi");
+        assert!(enc.decode::<GenerateResponse>(b"{").is_err());
+    }
 }

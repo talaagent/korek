@@ -11,7 +11,11 @@
 //! `Header=meta:<namespace>.<prop>` (`Layers=ext:setting.layers`). In-process
 //! callers can also add [`ColumnSource::With`] columns.
 
+#![no_std]
+
 extern crate alloc;
+
+use alloc::{borrow::ToOwned, format, string::String, string::ToString, vec, vec::Vec};
 
 mod md;
 mod words;

@@ -32,8 +32,8 @@ korek-gen-rust = { workspace = true, optional = true }
 korek-gen-ts = { workspace = true, optional = true }
 korek-gen-zod = { workspace = true, optional = true }
 korek-ir.workspace = true
-korek-plugin.workspace = true
-korek-runtime.workspace = true
+korek-plugin = { workspace = true, features = ["std"] }
+korek-runtime = { workspace = true, features = ["std", "regex", "json"] }
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std"] }
 thiserror.workspace = true

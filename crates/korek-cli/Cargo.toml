@@ -71,7 +71,7 @@ korek-gen-proto.workspace = true
 korek-gen-rust.workspace = true
 korek-gen-ts.workspace = true
 korek-gen-zod.workspace = true
-korek-plugin.workspace = true
+korek-plugin = { workspace = true, features = ["std"] }
 miette = { workspace = true, features = ["fancy"] }
 serde_json = { workspace = true, features = ["std"] }
 
@@ -81,7 +81,7 @@ insta.workspace = true
 korek = { workspace = true, features = ["generators"] }
 korek-core.workspace = true
 korek-ir.workspace = true
-korek-runtime.workspace = true
+korek-runtime = { workspace = true, features = ["std", "regex", "json"] }
 korek-testkit.workspace = true
 serde = { workspace = true, features = ["std"] }
 tempfile.workspace = true

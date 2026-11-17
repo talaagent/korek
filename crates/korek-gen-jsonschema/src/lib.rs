@@ -6,7 +6,11 @@
 //!
 //! Options: `file` (default `schema.json`), `per_type` (default `false`).
 
+#![no_std]
+
 extern crate alloc;
+
+use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
 
 use alloc::collections::BTreeSet;
 

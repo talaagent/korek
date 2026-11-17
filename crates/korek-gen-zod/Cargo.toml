@@ -21,4 +21,4 @@ korek-gen-common.workspace = true
 korek-gen-ts.workspace = true
 korek-ir.workspace = true
 korek-plugin.workspace = true
-serde_json = { workspace = true, features = ["std"] }
+serde_json.workspace = true

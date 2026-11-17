@@ -1,5 +1,7 @@
 //! Markdown helpers.
 
+use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
+
 /// `s` as an inline code span, fenced with more backticks than it holds.
 pub fn code(s: &str) -> String {
     let mut run = 0;

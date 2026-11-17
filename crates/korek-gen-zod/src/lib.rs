@@ -10,8 +10,14 @@
 //! Options: `file` (default `zod.ts`), `import` (where `z` comes from,
 //! default `zod`), `types`, `ts_path`.
 
+#![no_std]
+
+extern crate alloc;
+
+use alloc::{borrow::ToOwned, format, string::String, string::ToString, vec, vec::Vec};
+
+use alloc::collections::BTreeSet;
 use core::fmt::Write as _;
-use std::collections::HashSet;
 
 use korek_gen_common::{GENERATED, js, jsdoc, jsdoc_lines, ts_prop, unsupported};
 use korek_gen_ts::{declarations, key_path};
@@ -92,7 +98,7 @@ fn ordered(schema: &Schema) -> Vec<&TypeDef> {
     fn visit<'s>(
         s: &korek_ir::TypeIndex<'s>,
         t: &'s TypeDef,
-        done: &mut HashSet<&'s str>,
+        done: &mut BTreeSet<&'s str>,
         out: &mut Vec<&'s TypeDef>,
     ) {
         if !done.insert(&t.name) {
@@ -112,7 +118,7 @@ fn ordered(schema: &Schema) -> Vec<&TypeDef> {
         out.push(t);
     }
     let index = schema.index();
-    let mut done = HashSet::new();
+    let mut done = BTreeSet::new();
     let mut out = Vec::new();
     for t in &schema.types {
         visit(&index, t, &mut done, &mut out);

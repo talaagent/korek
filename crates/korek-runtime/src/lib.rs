@@ -7,8 +7,18 @@
 //!
 //! Validation does not allocate on the success path: paths are built on the
 //! stack ([`Path`]) and only formatted when a rule fails.
+//!
+//! The crate is `no_std` + `alloc` without the default `std` feature, which
+//! gates [`time::now`] (used by the `past`, `future` and `within` rules).
+
+#![no_std]
 
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
+
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 pub mod base64;
 pub mod format;
@@ -17,8 +27,6 @@ pub mod with;
 
 use core::fmt;
 
-#[cfg(feature = "regex")]
-pub use regex;
 #[cfg(feature = "json")]
 pub use serde_json;
 
@@ -171,18 +179,37 @@ pub fn unique<T: PartialEq>(items: &[T]) -> bool {
         .all(|(i, a)| items[i + 1..].iter().all(|b| a != b))
 }
 
+/// A compiled pattern, built on first use: one `static` per `pattern` rule.
+/// Works without std (`once_cell::race::OnceBox`; two threads racing on
+/// the first match may both compile it, one result is kept).
+#[cfg(feature = "regex")]
+#[derive(Debug, Default)]
+pub struct RegexCell(once_cell::race::OnceBox<regex_automata::meta::Regex>);
+
+#[cfg(feature = "regex")]
+impl RegexCell {
+    pub const fn new() -> Self {
+        Self(once_cell::race::OnceBox::new())
+    }
+}
+
 /// Whether `pattern` matches somewhere in `s`, compiling it once per call
 /// site (`cell` is a `static`).
 #[cfg(feature = "regex")]
-pub fn matches(cell: &std::sync::OnceLock<regex::Regex>, pattern: &str, s: &str) -> bool {
-    cell.get_or_init(|| regex::Regex::new(pattern).unwrap_or_else(|_| never()))
+pub fn matches(cell: &RegexCell, pattern: &str, s: &str) -> bool {
+    cell.0
+        .get_or_init(|| {
+            alloc::boxed::Box::new(
+                regex_automata::meta::Regex::new(pattern).unwrap_or_else(|_| never()),
+            )
+        })
         .is_match(s)
 }
 
 #[cfg(feature = "regex")]
-fn never() -> regex::Regex {
+fn never() -> regex_automata::meta::Regex {
     // korek checks patterns at load time; this only guards against misuse.
-    regex::Regex::new("[^\\s\\S]").unwrap_or_else(|_| unreachable!())
+    regex_automata::meta::Regex::new("[^\\s\\S]").unwrap_or_else(|_| unreachable!())
 }
 
 /// A rule on a key, as metadata: its name and JSON operand (`""` for
@@ -250,5 +277,34 @@ impl<T> fmt::Debug for Key<T> {
             )
             .field("rules", &self.rules)
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paths() {
+        let root = Path::Root;
+        let f = root.field("items");
+        let i = f.index(2);
+        assert_eq!(i.key("k").to_string(), "items[2][\"k\"]");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn patterns_compile_once() {
+        static RE: RegexCell = RegexCell::new();
+        assert!(matches(&RE, "^[a-z]+$", "abc"));
+        assert!(!matches(&RE, "ignored: the cell is set", "ABC"));
+        let bad = RegexCell::new();
+        assert!(!matches(&bad, "(", "("));
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn now_is_after_2020() {
+        assert!(time::now() > 1_577_836_800.0);
     }
 }

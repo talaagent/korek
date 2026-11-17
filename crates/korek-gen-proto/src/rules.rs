@@ -1,6 +1,8 @@
 //! korek rules → protovalidate (`buf.validate`) field rules, as one
 //! text-format aggregate per field.
 
+use alloc::{borrow::ToOwned, boxed::Box, format, string::String, string::ToString, vec::Vec};
+
 use core::fmt::Write as _;
 
 use korek_gen_common::{format_regex, unsupported};
@@ -94,9 +96,9 @@ fn bytes_lit(b: &[u8]) -> String {
 
 /// `{seconds: N, nanos: M}`.
 fn seconds(x: f64) -> String {
-    let s = x.floor();
+    let s = libm::floor(x);
     #[allow(clippy::cast_possible_truncation)]
-    let nanos = ((x - s) * 1e9).round() as i64;
+    let nanos = libm::round((x - s) * 1e9) as i64;
     #[allow(clippy::cast_possible_truncation)]
     let s = s as i64;
     if nanos == 0 {
@@ -124,7 +126,7 @@ fn lit(ty: &Type, kind: Option<&TypeKind>, j: &Json) -> Option<String> {
         },
         t if t.is_float() => {
             let f = j.as_f64()?;
-            if f.fract() == 0.0 {
+            if f - libm::trunc(f) == 0.0 {
                 format!("{f:.1}")
             } else {
                 format!("{f}")
