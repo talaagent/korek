@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- korek-runtime, korek-plugin and the korek-gen-* crates are `no_std` +
+  `alloc`. korek-runtime and korek-plugin get a default `std` feature that
+  gates `time::now` (the `past`/`future`/`within` rules) and `korek_plugin::run`;
+  callers on `default-features = false` must enable `std` to keep them.
+- Pattern rules use `regex-automata` instead of `regex`: the
+  `korek_runtime::regex` re-export is removed and `RegexCell` replaces
+  `std::sync::OnceLock` in `korek_runtime::matches`. Regenerate generated
+  Rust with this korek version.
+
 ## [0.1.0](https://github.com/talaagent/korek/releases/tag/v0.1.0) - 2026-11-15
 
 ### Added
