@@ -6,7 +6,7 @@
 //! later be defined in a korek schema. Structs are plain (constructible by
 //! other crates); rule and format enums are `#[non_exhaustive]`.
 
-use alloc::collections::BTreeMap;
+use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 
 use serde::{Deserialize, Serialize};
 

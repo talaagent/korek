@@ -11,6 +11,7 @@
 The intermediate representation and plugin protocol of [korek](https://github.com/talaagent/korek): the
 schema (types, fields, validation rules, keys, services) and the
 `GenerateRequest` / `GenerateResponse` messages, as plain serde data with
-minimal dependencies so generator plugins compile fast.
+minimal dependencies so generator plugins compile fast. `#![no_std]`: it
+needs only `alloc`.
 
 Part of [korek](https://github.com/talaagent/korek): schema files in, Rust, Protobuf, Zod, TypeScript and JSON Schema out.

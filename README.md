@@ -273,10 +273,10 @@ korek = "0.1"
 | Crate | What |
 |---|---|
 | `korek` | the facade: re-exports, generators (feature `generators`), and `Driver` |
-| `korek-ir` | the IR and plugin protocol: pure serde data, minimal deps |
+| `korek-ir` | the IR and plugin protocol: pure serde data, minimal deps, `no_std` + `alloc` |
 | `korek-plugin` | `run`, encoding, `Hook` (no parser dependency, so plugins build fast) |
 | `korek-core` | parsing, lowering, validation, lockfile, extensions (`miette` feature for rendering) |
-| `korek-gen-common` | helpers shared by the generators |
+| `korek-gen-common` | helpers shared by the generators (`no_std` + `alloc`) |
 | `korek-gen-*` | one library per generator: `generate(&schema, &opts, hooks)` and `plugin(&req)` |
 | `korek-runtime` | what generated Rust needs: `Validate`, `Key<T>`, formats, base64 |
 | `korek-testkit` | shared validation vectors and a conformance runner for any generator |

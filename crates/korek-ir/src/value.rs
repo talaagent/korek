@@ -1,5 +1,7 @@
 //! Typed values: JSON matched to a korek type.
 
+use alloc::{borrow::ToOwned, boxed::Box, format, string::String, vec::Vec};
+
 use crate::Types;
 use crate::ir::{Field, Json, Type, TypeKind};
 

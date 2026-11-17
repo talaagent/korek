@@ -41,8 +41,10 @@ kdl-nodes = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", r
 kdl-span = { version = "0.1.0", git = "https://github.com/talaagent/kdl-kit", rev = "922c43d", default-features = false }
 miette = "7"
 regex = "1"
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
+# korek-ir and korek-gen-common are no_std + alloc; the other crates opt
+# back into `std`.
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0.154", default-features = false, features = ["alloc", "preserve_order"] }
 tempfile = "3"
 thiserror = "2"
 

@@ -1,5 +1,7 @@
 //! Helpers over the pure-data IR and protocol types.
 
+use alloc::{borrow::ToOwned, format, string::String, vec, vec::Vec};
+
 use crate::ir::{Ext, Format, Key, KeyGroup, RuleKind, Schema, Span, Type, TypeDef, Validate};
 use crate::protocol::{Diagnostic, File, GenerateRequest, GenerateResponse, Label, Severity};
 
@@ -15,11 +17,11 @@ impl Types for Schema {
     }
 }
 
-/// Constant-time type lookup by name. Build it once per pass over a large
+/// Fast type lookup by name. Build it once per pass over a large
 /// schema ([`Schema::index`]).
 #[derive(Debug, Clone)]
 pub struct TypeIndex<'a> {
-    by_name: std::collections::HashMap<&'a str, &'a TypeDef>,
+    by_name: alloc::collections::BTreeMap<&'a str, &'a TypeDef>,
 }
 
 impl<'a> TypeIndex<'a> {
@@ -422,8 +424,13 @@ impl GenerateRequest {
 
 /// Formats a JSON number or bound without a trailing `.0` when whole.
 pub fn format_number(n: f64) -> String {
-    #[allow(clippy::cast_possible_truncation)]
-    if n.fract() == 0.0 && n.abs() < 1e15 {
+    // Whole (`n.fract() == 0.0`, which `core` lacks): the cast is exact below 1e15.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::float_cmp
+    )]
+    if n.abs() < 1e15 && n as i64 as f64 == n {
         format!("{}", n as i64)
     } else {
         format!("{n}")

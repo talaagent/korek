@@ -10,6 +10,6 @@
 
 Helpers shared by [korek](https://github.com/talaagent/korek)'s code generators: doc comments, identifier
 escaping, and the `korek::rule_unsupported` warning for rules a target
-cannot express.
+cannot express. `#![no_std]`: it needs only `alloc`.
 
 Part of [korek](https://github.com/talaagent/korek): schema files in, Rust, Protobuf, Zod, TypeScript and JSON Schema out.
