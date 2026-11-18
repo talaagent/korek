@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/talaagent/korek/compare/v0.1.0...v0.1.1) - 2026-11-18
+
+### Other
+
+- korek-runtime, korek-plugin, korek-gen-*: no_std + alloc (default std feature) ([#15](https://github.com/talaagent/korek/pull/15))
+- korek-ir, korek-gen-common: no_std + alloc ([#13](https://github.com/talaagent/korek/pull/13))
+
 ### Changed (breaking)
 
 - korek-runtime, korek-plugin and the korek-gen-* crates are `no_std` +
