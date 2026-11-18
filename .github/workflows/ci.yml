@@ -113,6 +113,7 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - uses: Swatinem/rust-cache@v2
       - run: nix develop -c cargo nextest run --profile ci --workspace --all-targets --locked
+      # - run: nix develop -c cargo faster check   # enable once cargo-faster >= 0.1.0 is on crates.io (needs talaagent/cargo-faster#88)
       # The READMEs' and crate docs' examples.
       - run: nix develop -c cargo test --workspace --doc --locked
       - name: test with miette rendering
