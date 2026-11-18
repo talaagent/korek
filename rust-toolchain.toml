@@ -1,7 +1,7 @@
 # The flake reads this through rust-overlay, so rustup users, editors and
 # `nix develop` share one toolchain.
 [toolchain]
-channel = "stable"
+channel = "1.100.0"
 components = ["rustfmt", "clippy", "rust-src"]
 # For the no_std build (CI's `no-std` job), also from `nix develop`.
 targets = ["thumbv7em-none-eabihf"]
