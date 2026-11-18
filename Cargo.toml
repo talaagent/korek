@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "examples/plugin-example"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/talaagent/korek"
@@ -13,20 +13,20 @@ homepage = "https://github.com/talaagent/korek"
 rust-version = "1.88"
 
 [workspace.dependencies]
-korek-core = { path = "crates/korek-core", version = "0.1.0" }
-korek-ir = { path = "crates/korek-ir", version = "0.1.0" }
-korek-runtime = { path = "crates/korek-runtime", version = "0.1.0", default-features = false }
-korek-gen-common = { path = "crates/korek-gen-common", version = "0.1.0" }
-korek-gen-docs = { path = "crates/korek-gen-docs", version = "0.1.0" }
-korek-gen-jsonschema = { path = "crates/korek-gen-jsonschema", version = "0.1.0" }
-korek-cli = { path = "crates/korek-cli", version = "0.1.0" }
-korek-plugin = { path = "crates/korek-plugin", version = "0.1.0", default-features = false }
-korek-gen-rust = { path = "crates/korek-gen-rust", version = "0.1.0" }
-korek-gen-proto = { path = "crates/korek-gen-proto", version = "0.1.0" }
-korek-gen-zod = { path = "crates/korek-gen-zod", version = "0.1.0" }
-korek-gen-ts = { path = "crates/korek-gen-ts", version = "0.1.0" }
-korek = { path = "crates/korek", version = "0.1.0", default-features = false }
-korek-testkit = { path = "crates/korek-testkit", version = "0.1.0" }
+korek-core = { path = "crates/korek-core", version = "0.1.1" }
+korek-ir = { path = "crates/korek-ir", version = "0.1.1" }
+korek-runtime = { path = "crates/korek-runtime", version = "0.1.1", default-features = false }
+korek-gen-common = { path = "crates/korek-gen-common", version = "0.1.1" }
+korek-gen-docs = { path = "crates/korek-gen-docs", version = "0.1.1" }
+korek-gen-jsonschema = { path = "crates/korek-gen-jsonschema", version = "0.1.1" }
+korek-cli = { path = "crates/korek-cli", version = "0.1.1" }
+korek-plugin = { path = "crates/korek-plugin", version = "0.1.1", default-features = false }
+korek-gen-rust = { path = "crates/korek-gen-rust", version = "0.1.1" }
+korek-gen-proto = { path = "crates/korek-gen-proto", version = "0.1.1" }
+korek-gen-zod = { path = "crates/korek-gen-zod", version = "0.1.1" }
+korek-gen-ts = { path = "crates/korek-gen-ts", version = "0.1.1" }
+korek = { path = "crates/korek", version = "0.1.1", default-features = false }
+korek-testkit = { path = "crates/korek-testkit", version = "0.1.1" }
 anyhow = "1"
 blake3 = "1"
 bpaf = { version = "0.9", features = ["derive"] }

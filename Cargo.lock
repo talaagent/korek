@@ -342,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "korek"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "blake3",
  "korek-core",
@@ -362,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "korek-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -388,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "korek-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "insta",
  "kdl-load",
@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "korek-fixture"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-core",
  "korek-gen-rust",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-common"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-ir",
  "serde_json",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-docs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-core",
  "korek-gen-common",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-example"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek",
  "korek-plugin",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-jsonschema"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-gen-common",
  "korek-ir",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-proto"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-core",
  "korek-gen-common",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-rust"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-gen-common",
  "korek-ir",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-ts"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-gen-common",
  "korek-ir",
@@ -492,7 +492,7 @@ dependencies = [
 
 [[package]]
 name = "korek-gen-zod"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-gen-common",
  "korek-gen-ts",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "korek-ir"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "korek-plugin"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-ir",
  "serde",
@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "korek-runtime"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "once_cell",
  "regex-automata",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "korek-testkit"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "korek-core",
  "korek-gen-rust",
