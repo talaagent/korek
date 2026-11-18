@@ -1,0 +1,46 @@
+#:schema https://raw.githubusercontent.com/talaagent/cargo-faster/main/docs/cargo-faster.schema.json
+# Reference: https://github.com/talaagent/cargo-faster/blob/main/docs/cargo-faster.md#the-configuration-file
+
+# The crates edited most in the last 6 months (git log over crates/).
+hot = ["korek-core", "korek-cli", "korek", "korek-ir"]
+
+[[accept]]
+id = "unused-dependency"
+crate = "korek-fixture"
+reason = "korek-fixture include!s the Rust generated from examples/basic and schema/korek, and that code calls korek_runtime; the source scan can't see into the generated files"
+
+[[accept]]
+id = "cheap-to-cut-edge"
+crate = "korek-plugin"
+reason = "every generator implements the plugin protocol (`plugin(&req)`) from korek-plugin by design; korek-plugin is the small protocol crate already"
+
+[[accept]]
+id = "cheap-to-cut-edge"
+crate = "korek-gen-common"
+reason = "korek-gen-common is the shared generator helper crate by design (AGENTS.md); copying its helpers into each generator would duplicate them"
+
+[[layer]]
+crates = "*"
+must_not_depend_on = ["tala-*"]
+reason = "a standalone public library; tala-agent depends on it, never the reverse"
+
+[[layer]]
+crates = ["korek-ir", "korek-plugin"]
+must_not_depend_on = ["korek", "korek-core", "korek-cli", "korek-gen-*", "korek-runtime", "korek-testkit", "korek-fixture"]
+reason = "korek-ir is pure IR/protocol data and korek-plugin depends on korek-ir only (AGENTS.md), so plugins build without the loader or generators"
+
+# Measured 2026-11-18 with `cargo faster check --timings` (cold, `nix develop`), on a shared
+# 32-core dev box, three runs, larger kept: cold check 9.7s; edit korek-core 7.4s,
+# korek-cli 1.1s, korek 1.3s, korek-ir 8.2s; critical path up to 6 workspace crates
+# (korek-ir → korek-gen-common → korek-gen-ts → korek-gen-zod → korek → korek-cli; other runs:
+# korek-ir → korek-plugin → korek-gen-example, and korek-cli); 2 duplicate versions
+# (syn, unicode-width). Budgets are those × 1.25, rounded up.
+[budgets]
+cold_check_secs = 13
+edit_rebuild_secs = { korek-core = 10, korek-cli = 2, korek = 2, korek-ir = 11 }
+critical_path_max_crates = 7
+no_new_critical_crates = ["korek-ir", "korek-plugin", "korek-gen-common", "korek-gen-ts", "korek-gen-zod", "korek-gen-example", "korek", "korek-cli"]
+max_duplicate_versions = 3
+
+[env]
+nextest_profile = "ci"
